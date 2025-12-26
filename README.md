@@ -4,6 +4,7 @@
 [![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/danielgatis/go-headless-term/master/LICENSE)
 [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/github.com/danielgatis/go-headless-term)
 
+<img width="1024" height="1024" alt="logo" src="https://github.com/user-attachments/assets/25c6b2bb-c8c8-4cfd-af4f-4177b30f87e0" />
 
 A VT220-compatible terminal emulator for Go that processes ANSI escape sequences and maintains terminal state without a display. You feed it bytes, it updates internal buffers, cursor position, colors, and modes. Useful for parsing terminal output, capturing screenshots, testing ANSI applications, or building terminal UIs.
 
