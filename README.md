@@ -86,6 +86,41 @@ func main() {
 }
 ```
 
+## Examples
+
+The repository includes working examples in the `examples/` directory:
+
+### Basic usage (`examples/basic/`)
+
+Demonstrates basic terminal operations: writing ANSI sequences, reading content, and checking cursor position.
+
+```bash
+cd examples/basic
+go run main.go
+```
+
+Shows:
+- Setting terminal title (OSC 0)
+- Text colors and formatting (SGR codes)
+- Screen clearing
+- Reading terminal state
+
+### Screenshot rendering (`examples/screenshot/`)
+
+Generates PNG images from terminal state, demonstrating the `Screenshot()` API.
+
+```bash
+cd examples/screenshot
+go run main.go
+```
+
+Creates `terminal_default.png` showing:
+- Custom fonts (TTF/OTF support)
+- 256-color palette
+- Text attributes (bold, underline, reverse)
+- ANSI color sequences
+- Box drawing characters
+
 ## Core concepts / API overview
 
 ### Terminal
