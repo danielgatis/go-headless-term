@@ -64,10 +64,27 @@ var DefaultBackground = color.RGBA{0, 0, 0, 255}
 // DefaultCursorColor is the default cursor rendering color (light gray).
 var DefaultCursorColor = color.RGBA{229, 229, 229, 255}
 
-// ResolveColor converts a color.Color to RGBA using the default palette.
+// Named color indices for semantic colors (used with NamedColor).
+const (
+	NamedColorForeground       = 256 // Default foreground text color
+	NamedColorBackground       = 257 // Default background color
+	NamedColorCursor           = 258 // Cursor color
+	NamedColorDimBlack         = 259 // Dim black
+	NamedColorDimRed           = 260 // Dim red
+	NamedColorDimGreen         = 261 // Dim green
+	NamedColorDimYellow        = 262 // Dim yellow
+	NamedColorDimBlue          = 263 // Dim blue
+	NamedColorDimMagenta       = 264 // Dim magenta
+	NamedColorDimCyan          = 265 // Dim cyan
+	NamedColorDimWhite         = 266 // Dim white
+	NamedColorBrightForeground = 267 // Bright foreground (white)
+	NamedColorDimForeground    = 268 // Dim foreground
+)
+
+// resolveDefaultColor converts a color.Color to RGBA using the default palette.
 // If c is nil, returns the default foreground or background based on fg.
 // IndexedColor and NamedColor are resolved using DefaultPalette.
-func ResolveColor(c color.Color, fg bool) color.RGBA {
+func resolveDefaultColor(c color.Color, fg bool) color.RGBA {
 	if c == nil {
 		if fg {
 			return DefaultForeground

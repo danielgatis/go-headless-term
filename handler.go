@@ -1097,7 +1097,7 @@ func (t *Terminal) setDynamicColorInternal(prefix string, index int, terminator 
 
 	var response string
 	if ok {
-		rgba := ResolveColor(c, true)
+		rgba := resolveDefaultColor(c, true)
 		response = fmt.Sprintf("\x1b]%s;rgb:%02x/%02x/%02x%s", prefix, rgba.R, rgba.G, rgba.B, terminator)
 	} else if index >= 0 && index < 256 {
 		rgba := DefaultPalette[index]
@@ -1437,6 +1437,7 @@ func (t *Terminal) setTerminalCharAttributeInternal(attr ansicode.TerminalCharAt
 }
 
 // resolveColor resolves the color from the attribute.
+// Returns a NamedColor default when no specific color is provided.
 func (t *Terminal) resolveColor(attr ansicode.TerminalCharAttribute) color.Color {
 	if attr.RGBColor != nil {
 		return color.RGBA{
@@ -1455,7 +1456,15 @@ func (t *Terminal) resolveColor(attr ansicode.TerminalCharAttribute) color.Color
 		return &NamedColor{Name: int(*attr.NamedColor)}
 	}
 
-	return nil
+	// Return appropriate default based on attribute type
+	switch attr.Attr {
+	case ansicode.CharAttributeForeground:
+		return &NamedColor{Name: NamedColorForeground}
+	case ansicode.CharAttributeBackground:
+		return &NamedColor{Name: NamedColorBackground}
+	default:
+		return &NamedColor{Name: NamedColorForeground}
+	}
 }
 
 // SetTitle updates the window title and notifies the title provider.

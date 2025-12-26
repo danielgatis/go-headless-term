@@ -41,20 +41,20 @@ type Hyperlink struct {
 	URI string
 }
 
-// NewCell creates a cell initialized with space character and no attributes.
+// NewCell creates a cell initialized with space character and default colors.
 func NewCell() Cell {
 	return Cell{
 		Char: ' ',
-		Fg:   nil,
-		Bg:   nil,
+		Fg:   &NamedColor{Name: NamedColorForeground},
+		Bg:   &NamedColor{Name: NamedColorBackground},
 	}
 }
 
-// Reset clears all attributes and sets the cell to default state (space character, no colors).
+// Reset clears all attributes and sets the cell to default state (space character, default colors).
 func (c *Cell) Reset() {
 	c.Char = ' '
-	c.Fg = nil
-	c.Bg = nil
+	c.Fg = &NamedColor{Name: NamedColorForeground}
+	c.Bg = &NamedColor{Name: NamedColorBackground}
 	c.UnderlineColor = nil
 	c.Flags = 0
 	c.Hyperlink = nil
