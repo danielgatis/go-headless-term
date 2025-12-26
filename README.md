@@ -4,7 +4,9 @@
 [![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/danielgatis/go-headless-term/master/LICENSE)
 [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/github.com/danielgatis/go-headless-term)
 
-<img width="1024" height="1024" alt="logo" src="https://github.com/user-attachments/assets/25c6b2bb-c8c8-4cfd-af4f-4177b30f87e0" />
+<p align="center">
+    <img width="512" height="512" alt="logo" src="https://github.com/user-attachments/assets/25c6b2bb-c8c8-4cfd-af4f-4177b30f87e0" />
+</p>
 
 A VT220-compatible terminal emulator for Go that processes ANSI escape sequences and maintains terminal state without a display. You feed it bytes, it updates internal buffers, cursor position, colors, and modes. Useful for parsing terminal output, capturing screenshots, testing ANSI applications, or building terminal UIs.
 
@@ -154,30 +156,6 @@ Cells track modification state:
 - `ClearDirty()`: Reset tracking
 
 Useful for incremental rendering (only redraw changed cells).
-
-## Limitations / non-goals
-
-**Not a PTY**: No process spawning, no shell interaction, no input handling. This is a state machine, not a terminal.
-
-**No rendering**: Doesn't draw to screen. Use `Screenshot()` to render to images, or build your own renderer using `Cell()` data.
-
-**VT220 focus**: Implements VT220-compatible subset. Some VT100/VT520 features may differ. Not aiming for 100% compatibility with all terminal types.
-
-**Wide character handling**: CJK and emoji are detected and use 2 columns, but combining marks (zero-width) are currently ignored.
-
-**Scrollback limits**: Scrollback is optional and storage-dependent. Alternate buffer has no scrollback by design.
-
-**Color resolution**: Indexed and named colors resolve at render time (via `ResolveColor()` or screenshot). The terminal stores color references, not final RGBA.
-
-**Thread safety**: Public API is safe, but direct buffer/cell mutation during reads may see inconsistent state (use locks if needed).
-
-## Project status
-
-**Active development**. API is relatively stable but may change based on feedback. Core ANSI parsing and state management are production-ready.
-
-**Testing**: Unit tests cover core functionality. Real-world ANSI output testing is encouraged.
-
-**Contributions**: Welcome. Focus areas: edge case handling, performance, documentation.
 
 ## Buy me a coffee
 
