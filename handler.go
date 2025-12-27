@@ -71,20 +71,48 @@ func (t *Terminal) kittyTransmit(cmd *KittyCommand) {
 	// Handle chunked transfer
 	if cmd.More {
 		t.images.mu.Lock()
+		accLen := len(t.images.accumulator)
+
+		// First chunk - save metadata
+		if accLen == 0 {
+			t.images.accumulatorID = cmd.ImageID
+			t.images.accumulatorFormat = cmd.Format
+			t.images.accumulatorWidth = cmd.Width
+			t.images.accumulatorHeight = cmd.Height
+			t.images.accumulatorCompression = cmd.Compression
+		}
+
 		t.images.accumulator = append(t.images.accumulator, cmd.Payload...)
-		t.images.accumulatorID = cmd.ImageID
 		t.images.accumulatorMore = true
 		t.images.mu.Unlock()
 		return
 	}
 
-	// Get complete payload
+	// Get complete payload and restore metadata from first chunk
 	var payload []byte
 	t.images.mu.Lock()
 	if t.images.accumulatorMore {
 		payload = append(t.images.accumulator, cmd.Payload...)
+		// Restore metadata from first chunk
+		if cmd.ImageID == 0 {
+			cmd.ImageID = t.images.accumulatorID
+		}
+		if cmd.Format == 0 || cmd.Width == 0 || cmd.Height == 0 {
+			cmd.Format = t.images.accumulatorFormat
+			cmd.Width = t.images.accumulatorWidth
+			cmd.Height = t.images.accumulatorHeight
+		}
+		if cmd.Compression == 0 {
+			cmd.Compression = t.images.accumulatorCompression
+		}
+		// Clear accumulator state
 		t.images.accumulator = nil
 		t.images.accumulatorMore = false
+		t.images.accumulatorID = 0
+		t.images.accumulatorFormat = 0
+		t.images.accumulatorWidth = 0
+		t.images.accumulatorHeight = 0
+		t.images.accumulatorCompression = 0
 	} else {
 		payload = cmd.Payload
 	}
@@ -1902,7 +1930,6 @@ func (t *Terminal) CellSizePixels() {
 }
 
 // SixelReceived handles incoming Sixel graphics data.
-// Currently a no-op stub - Sixel support is not implemented.
 func (t *Terminal) SixelReceived(params [][]uint16, data []byte) {
 	if t.middleware != nil && t.middleware.SixelReceived != nil {
 		t.middleware.SixelReceived(params, data, t.sixelReceivedInternal)

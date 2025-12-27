@@ -78,9 +78,13 @@ type ImageManager struct {
 	usedMemory  int64
 
 	// Kitty protocol state
-	accumulator     []byte  // For chunked transfers
-	accumulatorID   uint32  // Image ID for current accumulation
-	accumulatorMore bool    // More chunks expected
+	accumulator            []byte      // For chunked transfers
+	accumulatorID          uint32      // Image ID for current accumulation
+	accumulatorMore        bool        // More chunks expected
+	accumulatorFormat      KittyFormat // Format from first chunk
+	accumulatorWidth       uint32      // Width from first chunk
+	accumulatorHeight      uint32      // Height from first chunk
+	accumulatorCompression byte        // Compression from first chunk
 }
 
 // NewImageManager creates a new ImageManager with default settings.
