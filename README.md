@@ -4,16 +4,11 @@
 [![License MIT](https://img.shields.io/badge/license-MIT-blue.svg)](https://raw.githubusercontent.com/danielgatis/go-headless-term/master/LICENSE)
 [![Go Doc](https://img.shields.io/badge/godoc-reference-blue.svg?style=flat-square)](https://godoc.org/github.com/danielgatis/go-headless-term)
 
-<p align="center">
-    <img width="512" height="512" alt="logo" src="https://github.com/user-attachments/assets/25c6b2bb-c8c8-4cfd-af4f-4177b30f87e0" />
-</p>
-
-A VT220-compatible terminal emulator for Go that processes ANSI escape sequences and maintains terminal state without a display. You feed it bytes, it updates internal buffers, cursor position, colors, and modes. Useful for parsing terminal output, capturing screenshots, testing ANSI applications, or building terminal UIs.
+A VT220-compatible terminal emulator for Go that processes ANSI escape sequences and maintains terminal state without a display. You feed it bytes, it updates internal buffers, cursor position, colors, and modes. Useful for parsing terminal output, testing ANSI applications, or building terminal UIs.
 
 ## When should I use this?
 
 - **Parsing terminal output**: Process ANSI-colored output from commands and extract text/formatting
-- **Terminal screenshots**: Render terminal state to images (PNG, etc.) for documentation or previews
 - **ANSI testing**: Verify that applications produce correct escape sequences
 - **Terminal UI backends**: Build headless terminal interfaces that can be rendered later
 - **Log analysis**: Parse ANSI-formatted logs while preserving structure and colors
@@ -47,7 +42,7 @@ Raw bytes → ANSI decoder → Handler methods → State updates
 1. You call `Write()` or `WriteString()` with raw bytes
 2. Internal decoder parses ANSI sequences and calls handler methods (e.g., `Input()`, `Goto()`, `SetTerminalCharAttribute()`)
 3. Handlers update buffers, cursor, colors, or modes
-4. You read state via `Cell()`, `CursorPos()`, `String()`, or `Screenshot()`
+4. You read state via `Cell()`, `CursorPos()`, `String()`
 
 **Thread safety**: All public methods are safe for concurrent use (internal locking).
 
@@ -105,22 +100,6 @@ Shows:
 - Screen clearing
 - Reading terminal state
 
-### Screenshot rendering (`examples/screenshot/`)
-
-Generates PNG images from terminal state, demonstrating the `Screenshot()` API.
-
-```bash
-cd examples/screenshot
-go run main.go
-```
-
-Creates `terminal_default.png` showing:
-- Custom fonts (TTF/OTF support)
-- 256-color palette
-- Text attributes (bold, underline, reverse)
-- ANSI color sequences
-- Box drawing characters
-
 ## Core concepts / API overview
 
 ### Terminal
@@ -140,7 +119,6 @@ term := headlessterm.New(
 - `Cell(row, col)`: Get cell at position (returns `*Cell` or `nil`)
 - `CursorPos()`: Get cursor position (0-based)
 - `String()`: Get visible screen content as text
-- `Screenshot()`: Render to `*image.RGBA`
 - `Resize(rows, cols)`: Change dimensions
 - `IsAlternateScreen()`: Check if alternate buffer is active
 

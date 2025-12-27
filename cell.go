@@ -33,6 +33,7 @@ type Cell struct {
 	UnderlineColor color.Color
 	Flags          CellFlags
 	Hyperlink      *Hyperlink
+	Image          *CellImage // Image reference, nil if no image
 }
 
 // Hyperlink associates a cell with a clickable link (OSC 8).
@@ -58,6 +59,7 @@ func (c *Cell) Reset() {
 	c.UnderlineColor = nil
 	c.Flags = 0
 	c.Hyperlink = nil
+	c.Image = nil
 }
 
 // HasFlag returns true if the specified flag is set.
@@ -100,7 +102,7 @@ func (c *Cell) IsWideSpacer() bool {
 	return c.HasFlag(CellFlagWideCharSpacer)
 }
 
-// Copy returns a deep copy of the cell, including the hyperlink pointer.
+// Copy returns a deep copy of the cell, including the hyperlink and image pointers.
 func (c *Cell) Copy() Cell {
 	return Cell{
 		Char:           c.Char,
@@ -109,5 +111,11 @@ func (c *Cell) Copy() Cell {
 		UnderlineColor: c.UnderlineColor,
 		Flags:          c.Flags,
 		Hyperlink:      c.Hyperlink,
+		Image:          c.Image,
 	}
+}
+
+// HasImage returns true if this cell has an image reference.
+func (c *Cell) HasImage() bool {
+	return c.Image != nil
 }

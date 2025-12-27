@@ -18,8 +18,216 @@ func (t *Terminal) ApplicationCommandReceived(data []byte) {
 }
 
 func (t *Terminal) applicationCommandReceivedInternal(data []byte) {
+	// Check for Kitty graphics protocol (starts with 'G')
+	if len(data) > 0 && data[0] == 'G' {
+		t.handleKittyGraphics(data)
+		return
+	}
+
+	// Forward to APC provider for other APC sequences
 	if t.apcProvider != nil {
 		t.apcProvider.Receive(data)
+	}
+}
+
+// handleKittyGraphics processes a Kitty graphics protocol command.
+func (t *Terminal) handleKittyGraphics(data []byte) {
+	cmd, err := ParseKittyGraphics(data)
+	if err != nil {
+		return
+	}
+
+	switch cmd.Action {
+	case KittyActionQuery:
+		// Respond that we support the protocol
+		if cmd.Quiet < 2 {
+			response := FormatKittyResponse(cmd.ImageID, "", false)
+			t.writeResponseString(response)
+		}
+
+	case KittyActionTransmit:
+		// Transmit image data (store but don't display yet)
+		t.kittyTransmit(cmd)
+
+	case KittyActionTransmitDisplay:
+		// Transmit and display immediately
+		t.kittyTransmit(cmd)
+		if !cmd.More {
+			t.kittyDisplay(cmd)
+		}
+
+	case KittyActionDisplay:
+		// Display an already transmitted image
+		t.kittyDisplay(cmd)
+
+	case KittyActionDelete:
+		// Delete image(s)
+		t.kittyDelete(cmd)
+	}
+}
+
+// kittyTransmit handles image data transmission.
+func (t *Terminal) kittyTransmit(cmd *KittyCommand) {
+	// Handle chunked transfer
+	if cmd.More {
+		t.images.mu.Lock()
+		t.images.accumulator = append(t.images.accumulator, cmd.Payload...)
+		t.images.accumulatorID = cmd.ImageID
+		t.images.accumulatorMore = true
+		t.images.mu.Unlock()
+		return
+	}
+
+	// Get complete payload
+	var payload []byte
+	t.images.mu.Lock()
+	if t.images.accumulatorMore {
+		payload = append(t.images.accumulator, cmd.Payload...)
+		t.images.accumulator = nil
+		t.images.accumulatorMore = false
+	} else {
+		payload = cmd.Payload
+	}
+	t.images.mu.Unlock()
+
+	// Update command with complete payload
+	cmd.Payload = payload
+
+	// Decode image data
+	rgba, width, height, err := cmd.DecodeImageData()
+	if err != nil || width == 0 || height == 0 {
+		if cmd.Quiet < 2 {
+			response := FormatKittyResponse(cmd.ImageID, "ENODATA", true)
+			t.writeResponseString(response)
+		}
+		return
+	}
+
+	// Store the image
+	if cmd.ImageID > 0 {
+		t.images.StoreWithID(cmd.ImageID, width, height, rgba)
+	} else {
+		cmd.ImageID = t.images.Store(width, height, rgba)
+	}
+
+	// Send OK response
+	if cmd.Quiet < 1 {
+		response := FormatKittyResponse(cmd.ImageID, "", false)
+		t.writeResponseString(response)
+	}
+}
+
+// kittyDisplay displays an image at the current cursor position.
+func (t *Terminal) kittyDisplay(cmd *KittyCommand) {
+	img := t.images.Image(cmd.ImageID)
+	if img == nil {
+		if cmd.Quiet < 2 {
+			response := FormatKittyResponse(cmd.ImageID, "ENOENT", true)
+			t.writeResponseString(response)
+		}
+		return
+	}
+
+	// Calculate cell coverage
+	cellW, cellH := t.getCellSizePixels()
+
+	// Determine source region
+	srcW := cmd.SrcW
+	srcH := cmd.SrcH
+	if srcW == 0 {
+		srcW = img.Width - cmd.SrcX
+	}
+	if srcH == 0 {
+		srcH = img.Height - cmd.SrcY
+	}
+
+	// Determine target size in cells
+	cols := int(cmd.Cols)
+	rows := int(cmd.Rows)
+	if cols == 0 {
+		cols = int((srcW + uint32(cellW) - 1) / uint32(cellW))
+	}
+	if rows == 0 {
+		rows = int((srcH + uint32(cellH) - 1) / uint32(cellH))
+	}
+
+	// Get cursor position
+	t.mu.Lock()
+	curRow := t.cursor.Row
+	curCol := t.cursor.Col
+	t.mu.Unlock()
+
+	// Create placement
+	placement := &ImagePlacement{
+		ImageID: cmd.ImageID,
+		Row:     curRow,
+		Col:     curCol,
+		Cols:    cols,
+		Rows:    rows,
+		SrcX:    cmd.SrcX,
+		SrcY:    cmd.SrcY,
+		SrcW:    srcW,
+		SrcH:    srcH,
+		ZIndex:  cmd.ZIndex,
+		OffsetX: cmd.CellOffsetX,
+		OffsetY: cmd.CellOffsetY,
+	}
+
+	placementID := t.images.Place(placement)
+
+	// Assign image references to cells
+	t.assignImageToCells(cmd.ImageID, placementID, placement, img.Width, img.Height, cellW, cellH)
+
+	// Move cursor if not suppressed
+	if !cmd.DoNotMoveCursor {
+		t.mu.Lock()
+		t.cursor.Col += cols
+		if t.cursor.Col >= t.cols {
+			t.cursor.Col = 0
+			t.cursor.Row++
+			if t.cursor.Row >= t.rows {
+				t.cursor.Row = t.rows - 1
+			}
+		}
+		t.mu.Unlock()
+	}
+
+	// Send OK response
+	if cmd.Quiet < 1 {
+		response := FormatKittyResponse(cmd.ImageID, "", false)
+		t.writeResponseString(response)
+	}
+}
+
+// kittyDelete handles image deletion commands.
+func (t *Terminal) kittyDelete(cmd *KittyCommand) {
+	t.mu.Lock()
+	curRow := t.cursor.Row
+	curCol := t.cursor.Col
+	t.mu.Unlock()
+
+	switch cmd.Delete {
+	case KittyDeleteAll, KittyDeleteAllWithData:
+		// Delete all visible placements
+		t.images.Clear()
+
+	case KittyDeleteByID, KittyDeleteByIDWithData:
+		t.images.RemovePlacementsForImage(cmd.ImageID)
+		if cmd.Delete == KittyDeleteByIDWithData {
+			t.images.DeleteImage(cmd.ImageID)
+		}
+
+	case KittyDeleteAtCursor, KittyDeleteAtCursorData:
+		t.images.DeletePlacementsByPosition(curRow, curCol)
+
+	case KittyDeleteByCol, KittyDeleteByColData:
+		t.images.DeletePlacementsInColumn(curCol)
+
+	case KittyDeleteByRow, KittyDeleteByRowData:
+		t.images.DeletePlacementsInRow(curRow)
+
+	case KittyDeleteByZIndex, KittyDeleteByZIndexData:
+		t.images.DeletePlacementsByZIndex(cmd.ZIndex)
 	}
 }
 
@@ -1696,6 +1904,122 @@ func (t *Terminal) CellSizePixels() {
 // SixelReceived handles incoming Sixel graphics data.
 // Currently a no-op stub - Sixel support is not implemented.
 func (t *Terminal) SixelReceived(params [][]uint16, data []byte) {
-	// Sixel graphics not currently supported
-	// This is a placeholder to satisfy the ansicode.Handler interface
+	if t.middleware != nil && t.middleware.SixelReceived != nil {
+		t.middleware.SixelReceived(params, data, t.sixelReceivedInternal)
+		return
+	}
+	t.sixelReceivedInternal(params, data)
+}
+
+func (t *Terminal) sixelReceivedInternal(params [][]uint16, data []byte) {
+	// Convert params to int64 slice
+	var p []int64
+	for _, param := range params {
+		if len(param) > 0 {
+			p = append(p, int64(param[0]))
+		}
+	}
+
+	// Parse sixel data
+	img, err := ParseSixel(p, data)
+	if err != nil || img.Width == 0 || img.Height == 0 {
+		return
+	}
+
+	// Store image
+	imageID := t.images.Store(img.Width, img.Height, img.Data)
+
+	// Calculate cell coverage
+	cellWidth, cellHeight := t.getCellSizePixels()
+	cols := int((img.Width + uint32(cellWidth) - 1) / uint32(cellWidth))
+	rows := int((img.Height + uint32(cellHeight) - 1) / uint32(cellHeight))
+
+	// Create placement at cursor position
+	t.mu.Lock()
+	curRow := t.cursor.Row
+	curCol := t.cursor.Col
+	t.mu.Unlock()
+
+	placement := &ImagePlacement{
+		ImageID: imageID,
+		Row:     curRow,
+		Col:     curCol,
+		Cols:    cols,
+		Rows:    rows,
+		SrcX:    0,
+		SrcY:    0,
+		SrcW:    img.Width,
+		SrcH:    img.Height,
+		ZIndex:  0, // Sixel images are rendered in front of text
+	}
+
+	placementID := t.images.Place(placement)
+
+	// Assign image references to cells
+	t.assignImageToCells(imageID, placementID, placement, img.Width, img.Height, cellWidth, cellHeight)
+
+	// Move cursor down by number of rows (Sixel behavior)
+	t.mu.Lock()
+	t.cursor.Row += rows
+	if t.cursor.Row >= t.rows {
+		t.cursor.Row = t.rows - 1
+	}
+	t.mu.Unlock()
+}
+
+// getCellSizePixels returns the cell size in pixels.
+// Uses the SizeProvider if available, otherwise defaults to 10x20.
+func (t *Terminal) getCellSizePixels() (width, height int) {
+	if t.sizeProvider != nil {
+		w, h := t.sizeProvider.CellSizePixels()
+		if w > 0 && h > 0 {
+			return w, h
+		}
+	}
+	return 10, 20 // Default cell size
+}
+
+// assignImageToCells assigns image references to cells covered by a placement.
+func (t *Terminal) assignImageToCells(imageID, placementID uint32, p *ImagePlacement, imgW, imgH uint32, cellW, cellH int) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	for row := 0; row < p.Rows; row++ {
+		for col := 0; col < p.Cols; col++ {
+			cellRow := p.Row + row
+			cellCol := p.Col + col
+
+			if cellRow < 0 || cellRow >= t.rows || cellCol < 0 || cellCol >= t.cols {
+				continue
+			}
+
+			// Calculate UV coordinates for this cell
+			u0 := float32(col*cellW) / float32(imgW)
+			v0 := float32(row*cellH) / float32(imgH)
+			u1 := float32((col+1)*cellW) / float32(imgW)
+			v1 := float32((row+1)*cellH) / float32(imgH)
+
+			// Clamp to [0, 1]
+			if u1 > 1.0 {
+				u1 = 1.0
+			}
+			if v1 > 1.0 {
+				v1 = 1.0
+			}
+
+			cell := t.activeBuffer.Cell(cellRow, cellCol)
+			if cell != nil {
+				cell.Image = &CellImage{
+					PlacementID: placementID,
+					ImageID:     imageID,
+					U0:          u0,
+					V0:          v0,
+					U1:          u1,
+					V1:          v1,
+					ZIndex:      p.ZIndex,
+				}
+				cell.MarkDirty()
+			}
+		}
+	}
 }

@@ -157,6 +157,9 @@ type Terminal struct {
 
 	// Size provider for pixel-level queries
 	sizeProvider SizeProvider
+
+	// Image manager for Sixel and Kitty graphics
+	images *ImageManager
 }
 
 // Option configures a Terminal during construction.
@@ -323,6 +326,9 @@ func New(opts ...Option) *Terminal {
 
 	// Create internal decoder
 	t.decoder = ansicode.NewDecoder(t)
+
+	// Create image manager
+	t.images = NewImageManager()
 
 	return t
 }
@@ -982,4 +988,41 @@ func (t *Terminal) ClearRecording() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.recordingProvider.Clear()
+}
+
+// --- Image Methods ---
+
+// Image returns the image data for the given ID, or nil if not found.
+func (t *Terminal) Image(id uint32) *ImageData {
+	return t.images.Image(id)
+}
+
+// ImagePlacements returns all current image placements.
+func (t *Terminal) ImagePlacements() []*ImagePlacement {
+	return t.images.Placements()
+}
+
+// ImageCount returns the number of stored images.
+func (t *Terminal) ImageCount() int {
+	return t.images.ImageCount()
+}
+
+// ImagePlacementCount returns the number of active image placements.
+func (t *Terminal) ImagePlacementCount() int {
+	return t.images.PlacementCount()
+}
+
+// ImageUsedMemory returns the current image memory usage in bytes.
+func (t *Terminal) ImageUsedMemory() int64 {
+	return t.images.UsedMemory()
+}
+
+// SetImageMaxMemory sets the maximum memory budget for images.
+func (t *Terminal) SetImageMaxMemory(bytes int64) {
+	t.images.SetMaxMemory(bytes)
+}
+
+// ClearImages removes all images and placements.
+func (t *Terminal) ClearImages() {
+	t.images.Clear()
 }

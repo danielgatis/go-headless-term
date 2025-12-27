@@ -209,6 +209,9 @@ type Middleware struct {
 
 	// SetWorkingDirectory wraps the SetWorkingDirectory handler
 	SetWorkingDirectory func(uri string, next func(string))
+
+	// SixelReceived wraps the SixelReceived handler
+	SixelReceived func(params [][]uint16, data []byte, next func([][]uint16, []byte))
 }
 
 // Merge copies non-nil middleware functions from other into this, overwriting existing values.
@@ -417,5 +420,8 @@ func (m *Middleware) Merge(other *Middleware) {
 	}
 	if other.SetWorkingDirectory != nil {
 		m.SetWorkingDirectory = other.SetWorkingDirectory
+	}
+	if other.SixelReceived != nil {
+		m.SixelReceived = other.SixelReceived
 	}
 }
