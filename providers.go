@@ -151,6 +151,22 @@ func (NoopRecording) Record([]byte) {}
 func (NoopRecording) Data() []byte  { return nil }
 func (NoopRecording) Clear()        {}
 
+// --- Size Provider ---
+
+// SizeProvider provides pixel dimensions for CSI queries.
+type SizeProvider interface {
+	// WindowSizePixels returns the terminal window size in pixels.
+	WindowSizePixels() (width, height int)
+	// CellSizePixels returns the size of a single cell in pixels.
+	CellSizePixels() (width, height int)
+}
+
+// NoopSizeProvider returns default values for size queries.
+type NoopSizeProvider struct{}
+
+func (NoopSizeProvider) WindowSizePixels() (width, height int) { return 800, 600 }
+func (NoopSizeProvider) CellSizePixels() (width, height int)   { return 10, 20 }
+
 // Ensure implementations satisfy their interfaces
 var _ BellProvider = (*NoopBell)(nil)
 var _ TitleProvider = (*NoopTitle)(nil)
@@ -160,3 +176,4 @@ var _ SOSProvider = (*NoopSOS)(nil)
 var _ ClipboardProvider = (*NoopClipboard)(nil)
 var _ ScrollbackProvider = (*NoopScrollback)(nil)
 var _ RecordingProvider = (*NoopRecording)(nil)
+var _ SizeProvider = (*NoopSizeProvider)(nil)

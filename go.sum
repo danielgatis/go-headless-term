@@ -1,5 +1,3 @@
-github.com/danielgatis/go-ansicode v1.0.11 h1:yuc9rOCeU8VgoAE4WR87jY9VZUxTFeW3PLMnRGgFx6Y=
-github.com/danielgatis/go-ansicode v1.0.11/go.mod h1:i94Tvz37EBLhy6/Tqdgxr0/BVPefsRo4kdPawJzrPl4=
 github.com/danielgatis/go-iterator v0.0.1 h1:pTptWDVAKzR0EUdtfmFMP3v+hSetqB091V9um1DTO8I=
 github.com/danielgatis/go-iterator v0.0.1/go.mod h1:+gTbPAMdVIKwmqw7kr/mo5IFIzz2MFiRyYylcRvgbHs=
 github.com/danielgatis/go-utf8 v1.0.1 h1:0tXC3eI9I+11X3DwF46Auqjcq1KrsQCQsaI8k/ymGhU=

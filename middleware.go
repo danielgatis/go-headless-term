@@ -203,6 +203,12 @@ type Middleware struct {
 
 	// StartOfStringReceived wraps the StartOfStringReceived handler
 	StartOfStringReceived func(data []byte, next func([]byte))
+
+	// ShellIntegrationMark wraps the ShellIntegrationMark handler
+	ShellIntegrationMark func(mark ansicode.ShellIntegrationMark, exitCode int, next func(ansicode.ShellIntegrationMark, int))
+
+	// SetWorkingDirectory wraps the SetWorkingDirectory handler
+	SetWorkingDirectory func(uri string, next func(string))
 }
 
 // Merge copies non-nil middleware functions from other into this, overwriting existing values.
@@ -405,5 +411,11 @@ func (m *Middleware) Merge(other *Middleware) {
 	}
 	if other.StartOfStringReceived != nil {
 		m.StartOfStringReceived = other.StartOfStringReceived
+	}
+	if other.ShellIntegrationMark != nil {
+		m.ShellIntegrationMark = other.ShellIntegrationMark
+	}
+	if other.SetWorkingDirectory != nil {
+		m.SetWorkingDirectory = other.SetWorkingDirectory
 	}
 }

@@ -10,11 +10,12 @@ func TestNewCell(t *testing.T) {
 	if cell.Char != ' ' {
 		t.Errorf("expected space, got '%c'", cell.Char)
 	}
-	if cell.Fg != nil {
-		t.Error("expected nil foreground")
+	// NewCell initializes with default NamedColors for Fg and Bg
+	if fg, ok := cell.Fg.(*NamedColor); !ok || fg.Name != NamedColorForeground {
+		t.Error("expected default foreground NamedColor")
 	}
-	if cell.Bg != nil {
-		t.Error("expected nil background")
+	if bg, ok := cell.Bg.(*NamedColor); !ok || bg.Name != NamedColorBackground {
+		t.Error("expected default background NamedColor")
 	}
 	if cell.Flags != 0 {
 		t.Error("expected no flags")

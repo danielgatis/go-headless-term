@@ -14,3 +14,5 @@ require (
 	github.com/danielgatis/go-vte v1.0.10 // indirect
 	golang.org/x/text v0.32.0 // indirect
 )
+
+replace github.com/danielgatis/go-ansicode => ../go-ansicode

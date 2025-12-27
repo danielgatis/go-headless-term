@@ -1616,3 +1616,86 @@ type NamedColor struct {
 func (c *NamedColor) RGBA() (r, g, b, a uint32) {
 	return 0, 0, 0, 0xffff
 }
+
+// SetWorkingDirectory stores the current working directory (OSC 7).
+func (t *Terminal) SetWorkingDirectory(uri string) {
+	if t.middleware != nil && t.middleware.SetWorkingDirectory != nil {
+		t.middleware.SetWorkingDirectory(uri, t.setWorkingDirectoryInternal)
+		return
+	}
+	t.setWorkingDirectoryInternal(uri)
+}
+
+func (t *Terminal) setWorkingDirectoryInternal(uri string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.workingDir = uri
+}
+
+// WorkingDirectory returns the current working directory URI (OSC 7).
+func (t *Terminal) WorkingDirectory() string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.workingDir
+}
+
+// WorkingDirectoryPath extracts the path from the working directory URI.
+func (t *Terminal) WorkingDirectoryPath() string {
+	t.mu.RLock()
+	uri := t.workingDir
+	t.mu.RUnlock()
+
+	if uri == "" {
+		return ""
+	}
+
+	// Parse file://hostname/path
+	const prefix = "file://"
+	if len(uri) <= len(prefix) {
+		return ""
+	}
+	if uri[:len(prefix)] != prefix {
+		return ""
+	}
+	rest := uri[len(prefix):]
+
+	// Find the path after hostname
+	slashIdx := -1
+	for i := 0; i < len(rest); i++ {
+		if rest[i] == '/' {
+			slashIdx = i
+			break
+		}
+	}
+	if slashIdx < 0 {
+		return ""
+	}
+	return rest[slashIdx:]
+}
+
+// CellSizePixels sends the cell size in pixels via DSR response.
+func (t *Terminal) CellSizePixels() {
+	t.mu.RLock()
+	sizeProvider := t.sizeProvider
+	t.mu.RUnlock()
+
+	var cellWidth, cellHeight int
+	if sizeProvider != nil {
+		cellWidth, cellHeight = sizeProvider.CellSizePixels()
+	} else {
+		// Default cell size
+		cellWidth = 10
+		cellHeight = 20
+	}
+
+	// CSI 6 ; height ; width t
+	response := fmt.Sprintf("\x1b[6;%d;%dt", cellHeight, cellWidth)
+	t.writeResponseString(response)
+}
+
+// SixelReceived handles incoming Sixel graphics data.
+// Currently a no-op stub - Sixel support is not implemented.
+func (t *Terminal) SixelReceived(params [][]uint16, data []byte) {
+	// Sixel graphics not currently supported
+	// This is a placeholder to satisfy the ansicode.Handler interface
+}

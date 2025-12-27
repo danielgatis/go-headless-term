@@ -147,6 +147,16 @@ type Terminal struct {
 
 	// Recording provider for capturing raw input
 	recordingProvider RecordingProvider
+
+	// Shell integration
+	shellIntegrationProvider ShellIntegrationProvider
+	promptMarks              []PromptMark
+
+	// Working directory (OSC 7)
+	workingDir string
+
+	// Size provider for pixel-level queries
+	sizeProvider SizeProvider
 }
 
 // Option configures a Terminal during construction.
@@ -257,6 +267,20 @@ func WithAutoResize() Option {
 func WithRecording(p RecordingProvider) Option {
 	return func(t *Terminal) {
 		t.recordingProvider = p
+	}
+}
+
+// WithShellIntegration sets the handler for shell integration events (OSC 133).
+func WithShellIntegration(p ShellIntegrationProvider) Option {
+	return func(t *Terminal) {
+		t.shellIntegrationProvider = p
+	}
+}
+
+// WithSizeProvider sets the provider for pixel dimension queries.
+func WithSizeProvider(p SizeProvider) Option {
+	return func(t *Terminal) {
+		t.sizeProvider = p
 	}
 }
 
