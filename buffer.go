@@ -294,7 +294,8 @@ func (b *Buffer) DeleteChars(row, col, n int) {
 }
 
 // Resize changes buffer dimensions, preserving existing cells where possible.
-// New cells are initialized to default state and marked dirty.
+// Content is kept at the top-left corner. When shrinking, bottom/right content is lost.
+// When growing, new empty cells are added at the bottom/right.
 // Tab stops are extended if columns increase.
 func (b *Buffer) Resize(rows, cols int) {
 	if rows <= 0 || cols <= 0 {

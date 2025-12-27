@@ -391,7 +391,8 @@ func (t *Terminal) HasMode(mode TerminalMode) bool {
 }
 
 // Resize changes the terminal dimensions and adjusts buffers accordingly.
-// Cursor position is clamped to the new bounds.
+// When shrinking rows, lines above cursor are moved to scrollback to preserve
+// content near the cursor. Cursor position is clamped to the new bounds.
 // Invalid dimensions (<= 0) are ignored.
 func (t *Terminal) Resize(rows, cols int) {
 	if rows <= 0 || cols <= 0 {
@@ -401,12 +402,29 @@ func (t *Terminal) Resize(rows, cols int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	oldRows := t.rows
+
+	// When shrinking rows on primary buffer, scroll lines to scrollback
+	// to preserve content near cursor
+	if rows < oldRows && t.activeBuffer == t.primaryBuffer {
+		linesToScroll := oldRows - rows
+		// Only scroll if cursor would be pushed off screen
+		if t.cursor.Row >= rows {
+			// Scroll up to keep cursor visible
+			t.primaryBuffer.ScrollUp(0, oldRows, linesToScroll)
+			t.cursor.Row -= linesToScroll
+			if t.cursor.Row < 0 {
+				t.cursor.Row = 0
+			}
+		}
+	}
+
 	t.rows = rows
 	t.cols = cols
 	t.primaryBuffer.Resize(rows, cols)
 	t.alternateBuffer.Resize(rows, cols)
 
-	// Adjust cursor position
+	// Clamp cursor to bounds
 	if t.cursor.Row >= rows {
 		t.cursor.Row = rows - 1
 	}

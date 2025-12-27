@@ -2006,7 +2006,7 @@ func (t *Terminal) getCellSizePixels() (width, height int) {
 	return 10, 20 // Default cell size
 }
 
-// assignImageToCells assigns image references to cells covered by a placement.
+// assignImageToCells assigns image references and placeholder characters to cells covered by a placement.
 func (t *Terminal) assignImageToCells(imageID, placementID uint32, p *ImagePlacement, imgW, imgH uint32, cellW, cellH int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
@@ -2036,6 +2036,8 @@ func (t *Terminal) assignImageToCells(imageID, placementID uint32, p *ImagePlace
 
 			cell := t.activeBuffer.Cell(cellRow, cellCol)
 			if cell != nil {
+				// Write placeholder character to reserve space
+				cell.Char = ImagePlaceholderChar
 				cell.Image = &CellImage{
 					PlacementID: placementID,
 					ImageID:     imageID,

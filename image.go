@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+// ImagePlaceholderChar is the Unicode character used to mark cells occupied by images.
+// This is in the Private Use Area (Plane 16) and used by Kitty Graphics Protocol.
+const ImagePlaceholderChar = '\U0010EEEE'
+
 // ImageFormat represents the format of image data.
 type ImageFormat uint8
 

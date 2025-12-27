@@ -998,3 +998,251 @@ func TestInputWithInvalidCursorPosition(t *testing.T) {
 		t.Errorf("cursor out of bounds after write: (%d, %d)", row2, col2)
 	}
 }
+
+// TestResizeShrinkWithCursorInBounds tests resize when cursor stays within new bounds
+func TestResizeShrinkWithCursorInBounds(t *testing.T) {
+	storage := &testScrollback{lines: make([][]Cell, 0)}
+	storage.SetMaxLines(100)
+
+	term := New(WithSize(10, 80), WithScrollback(storage))
+
+	// Write content on first few lines
+	term.WriteString("Line0\r\n")
+	term.WriteString("Line1\r\n")
+	term.WriteString("Line2")
+
+	// Cursor should be on row 2
+	row, _ := term.CursorPos()
+	if row != 2 {
+		t.Errorf("expected cursor on row 2, got %d", row)
+	}
+
+	initialScrollbackLen := storage.Len()
+
+	// Resize to 5 rows - cursor is still within bounds (row 2 < 5)
+	term.Resize(5, 80)
+
+	// No lines should be scrolled to scrollback
+	if storage.Len() != initialScrollbackLen {
+		t.Errorf("expected no new scrollback lines, got %d new lines", storage.Len()-initialScrollbackLen)
+	}
+
+	// Content should be preserved
+	if term.LineContent(0) != "Line0" {
+		t.Errorf("expected 'Line0', got '%s'", term.LineContent(0))
+	}
+	if term.LineContent(2) != "Line2" {
+		t.Errorf("expected 'Line2', got '%s'", term.LineContent(2))
+	}
+
+	// Cursor should still be on row 2
+	row, _ = term.CursorPos()
+	if row != 2 {
+		t.Errorf("expected cursor on row 2 after resize, got %d", row)
+	}
+}
+
+// TestResizeShrinkWithCursorOutOfBounds tests resize when cursor would be outside new bounds
+func TestResizeShrinkWithCursorOutOfBounds(t *testing.T) {
+	storage := &testScrollback{lines: make([][]Cell, 0)}
+	storage.SetMaxLines(100)
+
+	term := New(WithSize(10, 80), WithScrollback(storage))
+
+	// Write content filling more lines
+	for i := 0; i < 8; i++ {
+		term.WriteString("Line" + string(rune('0'+i)) + "\r\n")
+	}
+	term.WriteString("Line8") // Cursor ends on row 8
+
+	row, _ := term.CursorPos()
+	if row != 8 {
+		t.Errorf("expected cursor on row 8, got %d", row)
+	}
+
+	initialScrollbackLen := storage.Len()
+
+	// Resize to 5 rows - cursor at row 8 is outside bounds
+	// Lines should be scrolled to preserve content near cursor
+	term.Resize(5, 80)
+
+	// Lines should have been pushed to scrollback
+	newScrollbackLines := storage.Len() - initialScrollbackLen
+	if newScrollbackLines == 0 {
+		t.Error("expected lines to be pushed to scrollback when cursor is out of bounds")
+	}
+
+	// Cursor should be within new bounds
+	row, _ = term.CursorPos()
+	if row < 0 || row >= 5 {
+		t.Errorf("cursor row out of bounds after resize: %d (expected 0-4)", row)
+	}
+
+	// Content near cursor should be preserved (Line8 should still be visible)
+	found := false
+	for i := 0; i < 5; i++ {
+		if strings.Contains(term.LineContent(i), "Line8") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected Line8 (near cursor) to be preserved after resize")
+	}
+}
+
+// TestResizeShrinkScrollbackContent tests that scrolled lines go to scrollback correctly
+func TestResizeShrinkScrollbackContent(t *testing.T) {
+	storage := &testScrollback{lines: make([][]Cell, 0)}
+	storage.SetMaxLines(100)
+
+	term := New(WithSize(10, 80), WithScrollback(storage))
+
+	// Write content on all lines
+	for i := 0; i < 10; i++ {
+		if i < 9 {
+			term.WriteString("Line" + string(rune('0'+i)) + "\r\n")
+		} else {
+			term.WriteString("Line9")
+		}
+	}
+
+	// Cursor on row 9
+	row, _ := term.CursorPos()
+	if row != 9 {
+		t.Errorf("expected cursor on row 9, got %d", row)
+	}
+
+	// Resize to 5 rows
+	term.Resize(5, 80)
+
+	// Check scrollback contains the lines that were pushed
+	if storage.Len() < 5 {
+		t.Errorf("expected at least 5 lines in scrollback, got %d", storage.Len())
+	}
+
+	// First lines should be in scrollback
+	foundLine0 := false
+	for i := 0; i < storage.Len(); i++ {
+		line := storage.Line(i)
+		if line != nil && len(line) > 0 {
+			content := ""
+			for _, cell := range line {
+				if cell.Char != 0 && cell.Char != ' ' {
+					content += string(cell.Char)
+				}
+			}
+			if strings.HasPrefix(content, "Line0") {
+				foundLine0 = true
+				break
+			}
+		}
+	}
+	if !foundLine0 {
+		t.Error("expected Line0 to be in scrollback after resize")
+	}
+}
+
+// TestResizeGrowDoesNotAffectScrollback tests that growing terminal doesn't touch scrollback
+func TestResizeGrowDoesNotAffectScrollback(t *testing.T) {
+	storage := &testScrollback{lines: make([][]Cell, 0)}
+	storage.SetMaxLines(100)
+
+	term := New(WithSize(5, 80), WithScrollback(storage))
+
+	// Write some content
+	term.WriteString("Line0\r\n")
+	term.WriteString("Line1\r\n")
+	term.WriteString("Line2")
+
+	row, _ := term.CursorPos()
+	initialRow := row
+	initialScrollbackLen := storage.Len()
+
+	// Grow terminal
+	term.Resize(10, 80)
+
+	// Scrollback should not change
+	if storage.Len() != initialScrollbackLen {
+		t.Errorf("expected scrollback unchanged, was %d now %d", initialScrollbackLen, storage.Len())
+	}
+
+	// Cursor should stay at same position
+	row, _ = term.CursorPos()
+	if row != initialRow {
+		t.Errorf("expected cursor to stay at row %d, got %d", initialRow, row)
+	}
+
+	// Content should be preserved
+	if term.LineContent(0) != "Line0" {
+		t.Errorf("expected 'Line0', got '%s'", term.LineContent(0))
+	}
+}
+
+// TestResizeAlternateScreenNoScrollback tests that alternate screen doesn't use scrollback on resize
+func TestResizeAlternateScreenNoScrollback(t *testing.T) {
+	storage := &testScrollback{lines: make([][]Cell, 0)}
+	storage.SetMaxLines(100)
+
+	term := New(WithSize(10, 80), WithScrollback(storage))
+
+	// Switch to alternate screen
+	term.WriteString("\x1b[?1049h")
+
+	// Write content
+	for i := 0; i < 8; i++ {
+		term.WriteString("Alt" + string(rune('0'+i)) + "\r\n")
+	}
+	term.WriteString("Alt8")
+
+	initialScrollbackLen := storage.Len()
+
+	// Resize - alternate screen should NOT push to scrollback
+	term.Resize(5, 80)
+
+	// Scrollback should not have new lines from alternate screen
+	if storage.Len() != initialScrollbackLen {
+		t.Errorf("alternate screen should not push to scrollback, was %d now %d",
+			initialScrollbackLen, storage.Len())
+	}
+}
+
+// TestResizeCursorPositionAfterShrink tests cursor position is correctly adjusted
+func TestResizeCursorPositionAfterShrink(t *testing.T) {
+	storage := &testScrollback{lines: make([][]Cell, 0)}
+	storage.SetMaxLines(100)
+
+	term := New(WithSize(20, 80), WithScrollback(storage))
+
+	// Move cursor to row 15
+	for i := 0; i < 15; i++ {
+		term.WriteString("Line\r\n")
+	}
+	term.WriteString("CursorLine")
+
+	row, _ := term.CursorPos()
+	if row != 15 {
+		t.Errorf("expected cursor on row 15, got %d", row)
+	}
+
+	// Resize to 10 rows
+	term.Resize(10, 80)
+
+	// Cursor should be adjusted (15 - (20-10) = 5, but clamped to valid range)
+	row, _ = term.CursorPos()
+	if row < 0 || row >= 10 {
+		t.Errorf("cursor out of bounds after resize: %d", row)
+	}
+
+	// The line with "CursorLine" should still be visible
+	found := false
+	for i := 0; i < 10; i++ {
+		if strings.Contains(term.LineContent(i), "CursorLine") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("expected CursorLine to be visible after resize")
+	}
+}
