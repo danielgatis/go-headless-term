@@ -1044,3 +1044,10 @@ func (t *Terminal) SetImageMaxMemory(bytes int64) {
 func (t *Terminal) ClearImages() {
 	t.images.Clear()
 }
+
+// SetSizeProvider sets the provider for pixel dimension queries.
+func (t *Terminal) SetSizeProvider(p SizeProvider) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.sizeProvider = p
+}

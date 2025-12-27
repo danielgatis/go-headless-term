@@ -62,6 +62,9 @@ type CellImage struct {
 	U0, V0      float32 // Top-left corner
 	U1, V1      float32 // Bottom-right corner
 
+	// Scale factors for rendering (1.0 = no scaling)
+	ScaleX, ScaleY float32
+
 	// Z-index for render ordering
 	ZIndex      int32
 }
@@ -282,6 +285,13 @@ func (m *ImageManager) Clear() {
 	m.accumulator = nil
 }
 
+// ClearPlacements removes all placements but keeps image data.
+func (m *ImageManager) ClearPlacements() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.placements = make(map[uint32]*ImagePlacement)
+}
+
 // UsedMemory returns the current memory usage in bytes.
 func (m *ImageManager) UsedMemory() int64 {
 	m.mu.RLock()
@@ -392,6 +402,46 @@ func (m *ImageManager) DeletePlacementsInColumn(col int) {
 
 	for id, p := range m.placements {
 		if col >= p.Col && col < p.Col+p.Cols {
+			delete(m.placements, id)
+		}
+	}
+}
+
+// DeletePlacementsInRowRange removes all placements that intersect rows in [startRow, endRow).
+func (m *ImageManager) DeletePlacementsInRowRange(startRow, endRow int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for id, p := range m.placements {
+		placementEnd := p.Row + p.Rows
+		// Check if placement overlaps with the row range
+		if p.Row < endRow && placementEnd > startRow {
+			delete(m.placements, id)
+		}
+	}
+}
+
+// DeletePlacementsBelow removes all placements at or below the given row.
+func (m *ImageManager) DeletePlacementsBelow(row int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for id, p := range m.placements {
+		// Placement intersects if any part is at row or below
+		if p.Row+p.Rows > row {
+			delete(m.placements, id)
+		}
+	}
+}
+
+// DeletePlacementsAbove removes all placements at or above the given row.
+func (m *ImageManager) DeletePlacementsAbove(row int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for id, p := range m.placements {
+		// Placement intersects if any part is at row or above
+		if p.Row <= row {
 			delete(m.placements, id)
 		}
 	}

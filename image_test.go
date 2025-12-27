@@ -201,3 +201,179 @@ func TestCellImage(t *testing.T) {
 		t.Error("cell should not have image after reset")
 	}
 }
+
+func TestImageManager_DeletePlacementsInRowRange(t *testing.T) {
+	m := NewImageManager()
+
+	data := make([]byte, 100)
+	imageID := m.Store(10, 10, data)
+
+	// Placement at rows 0-2
+	m.Place(&ImagePlacement{ImageID: imageID, Row: 0, Col: 0, Cols: 2, Rows: 3})
+	// Placement at rows 5-7
+	m.Place(&ImagePlacement{ImageID: imageID, Row: 5, Col: 0, Cols: 2, Rows: 3})
+	// Placement at rows 10-12
+	m.Place(&ImagePlacement{ImageID: imageID, Row: 10, Col: 0, Cols: 2, Rows: 3})
+
+	// Delete placements in row range 4-8 (should only affect the second placement)
+	m.DeletePlacementsInRowRange(4, 8)
+
+	if m.PlacementCount() != 2 {
+		t.Errorf("expected 2 placements after delete, got %d", m.PlacementCount())
+	}
+}
+
+func TestImageManager_DeletePlacementsBelow(t *testing.T) {
+	m := NewImageManager()
+
+	data := make([]byte, 100)
+	imageID := m.Store(10, 10, data)
+
+	// Placement at rows 0-2
+	m.Place(&ImagePlacement{ImageID: imageID, Row: 0, Col: 0, Cols: 2, Rows: 3})
+	// Placement at rows 5-7
+	m.Place(&ImagePlacement{ImageID: imageID, Row: 5, Col: 0, Cols: 2, Rows: 3})
+	// Placement at rows 10-12
+	m.Place(&ImagePlacement{ImageID: imageID, Row: 10, Col: 0, Cols: 2, Rows: 3})
+
+	// Delete placements below row 4 (should delete second and third)
+	m.DeletePlacementsBelow(4)
+
+	if m.PlacementCount() != 1 {
+		t.Errorf("expected 1 placement after delete, got %d", m.PlacementCount())
+	}
+}
+
+func TestImageManager_DeletePlacementsAbove(t *testing.T) {
+	m := NewImageManager()
+
+	data := make([]byte, 100)
+	imageID := m.Store(10, 10, data)
+
+	// Placement at rows 0-2
+	m.Place(&ImagePlacement{ImageID: imageID, Row: 0, Col: 0, Cols: 2, Rows: 3})
+	// Placement at rows 5-7
+	m.Place(&ImagePlacement{ImageID: imageID, Row: 5, Col: 0, Cols: 2, Rows: 3})
+	// Placement at rows 10-12
+	m.Place(&ImagePlacement{ImageID: imageID, Row: 10, Col: 0, Cols: 2, Rows: 3})
+
+	// Delete placements above row 7 (should delete first and second)
+	m.DeletePlacementsAbove(7)
+
+	if m.PlacementCount() != 1 {
+		t.Errorf("expected 1 placement after delete, got %d", m.PlacementCount())
+	}
+}
+
+// TestClearScreenClearsImages verifies that CSI 2J clears all image placements
+func TestClearScreenClearsImages(t *testing.T) {
+	term := New(WithSize(24, 80))
+
+	// Add an image
+	data := make([]byte, 100)
+	imageID := term.images.Store(10, 10, data)
+	term.images.Place(&ImagePlacement{ImageID: imageID, Row: 5, Col: 5, Cols: 2, Rows: 2})
+
+	if term.ImagePlacementCount() != 1 {
+		t.Fatalf("expected 1 placement, got %d", term.ImagePlacementCount())
+	}
+
+	// Clear screen with CSI 2J
+	term.WriteString("\x1b[2J")
+
+	// All placements should be cleared
+	if term.ImagePlacementCount() != 0 {
+		t.Errorf("expected 0 placements after CSI 2J, got %d", term.ImagePlacementCount())
+	}
+
+	// Image data should still exist
+	if term.ImageCount() != 1 {
+		t.Errorf("expected 1 image (data preserved), got %d", term.ImageCount())
+	}
+}
+
+// TestClearScreenBelowClearsImages verifies that CSI 0J clears images below cursor
+func TestClearScreenBelowClearsImages(t *testing.T) {
+	term := New(WithSize(24, 80))
+
+	// Add images above and below cursor position
+	data := make([]byte, 100)
+	imageID := term.images.Store(10, 10, data)
+	term.images.Place(&ImagePlacement{ImageID: imageID, Row: 2, Col: 0, Cols: 2, Rows: 2})  // Above
+	term.images.Place(&ImagePlacement{ImageID: imageID, Row: 10, Col: 0, Cols: 2, Rows: 2}) // Below
+
+	// Position cursor at row 5
+	term.WriteString("\x1b[6;1H")
+
+	// Clear screen below (CSI 0J)
+	term.WriteString("\x1b[0J")
+
+	// Only placement below should be cleared
+	if term.ImagePlacementCount() != 1 {
+		t.Errorf("expected 1 placement after CSI 0J, got %d", term.ImagePlacementCount())
+	}
+}
+
+// TestResetStateClearsImagesAndCache verifies that terminal reset clears all images
+func TestResetStateClearsImagesAndCache(t *testing.T) {
+	term := New(WithSize(24, 80))
+
+	// Add an image
+	data := make([]byte, 100)
+	imageID := term.images.Store(10, 10, data)
+	term.images.Place(&ImagePlacement{ImageID: imageID, Row: 5, Col: 5, Cols: 2, Rows: 2})
+
+	if term.ImageCount() != 1 || term.ImagePlacementCount() != 1 {
+		t.Fatalf("expected 1 image and 1 placement, got %d and %d", term.ImageCount(), term.ImagePlacementCount())
+	}
+
+	// Reset terminal (RIS - ESC c)
+	term.WriteString("\x1bc")
+
+	// Both images and placements should be cleared
+	if term.ImageCount() != 0 {
+		t.Errorf("expected 0 images after reset, got %d", term.ImageCount())
+	}
+	if term.ImagePlacementCount() != 0 {
+		t.Errorf("expected 0 placements after reset, got %d", term.ImagePlacementCount())
+	}
+}
+
+// TestAlternateScreenClearsImages verifies that switching screens clears placements
+func TestAlternateScreenClearsImages(t *testing.T) {
+	term := New(WithSize(24, 80))
+
+	// Add an image
+	data := make([]byte, 100)
+	imageID := term.images.Store(10, 10, data)
+	term.images.Place(&ImagePlacement{ImageID: imageID, Row: 5, Col: 5, Cols: 2, Rows: 2})
+
+	if term.ImagePlacementCount() != 1 {
+		t.Fatalf("expected 1 placement, got %d", term.ImagePlacementCount())
+	}
+
+	// Switch to alternate screen (CSI ? 1049 h)
+	term.WriteString("\x1b[?1049h")
+
+	// Placements should be cleared
+	if term.ImagePlacementCount() != 0 {
+		t.Errorf("expected 0 placements after switching to alternate screen, got %d", term.ImagePlacementCount())
+	}
+
+	// Image data should still exist
+	if term.ImageCount() != 1 {
+		t.Errorf("expected 1 image (data preserved), got %d", term.ImageCount())
+	}
+
+	// Add another image on alternate screen
+	imageID2 := term.images.Store(20, 20, data)
+	term.images.Place(&ImagePlacement{ImageID: imageID2, Row: 0, Col: 0, Cols: 3, Rows: 3})
+
+	// Switch back to primary screen (CSI ? 1049 l)
+	term.WriteString("\x1b[?1049l")
+
+	// Placements should be cleared again
+	if term.ImagePlacementCount() != 0 {
+		t.Errorf("expected 0 placements after switching back to primary screen, got %d", term.ImagePlacementCount())
+	}
+}

@@ -203,13 +203,15 @@ func (t *Terminal) kittyDisplay(cmd *KittyCommand) {
 
 	placementID := t.images.Place(placement)
 
-	// Assign image references to cells
+	// Assign image references to cells (may scroll and update placement.Row)
 	t.assignImageToCells(cmd.ImageID, placementID, placement, img.Width, img.Height, cellW, cellH)
 
 	// Move cursor if not suppressed
+	// Use placement values which may have been updated if scrolling occurred
 	if !cmd.DoNotMoveCursor {
 		t.mu.Lock()
-		t.cursor.Col += cols
+		t.cursor.Row = placement.Row
+		t.cursor.Col = placement.Col + cols
 		if t.cursor.Col >= t.cols {
 			t.cursor.Col = 0
 			t.cursor.Row++
@@ -235,8 +237,12 @@ func (t *Terminal) kittyDelete(cmd *KittyCommand) {
 	t.mu.Unlock()
 
 	switch cmd.Delete {
-	case KittyDeleteAll, KittyDeleteAllWithData:
-		// Delete all visible placements
+	case KittyDeleteAll:
+		// Delete all visible placements (keep image data)
+		t.images.ClearPlacements()
+
+	case KittyDeleteAllWithData:
+		// Delete all placements AND image data
 		t.images.Clear()
 
 	case KittyDeleteByID, KittyDeleteByIDWithData:
@@ -351,17 +357,25 @@ func (t *Terminal) clearScreenInternal(mode ansicode.ClearMode) {
 		for row := t.cursor.Row + 1; row < t.rows; row++ {
 			t.activeBuffer.ClearRow(row)
 		}
+		// Clear images that intersect with cleared region
+		t.images.DeletePlacementsBelow(t.cursor.Row)
 	case ansicode.ClearModeAbove:
 		// Clear from beginning to cursor
 		for row := 0; row < t.cursor.Row; row++ {
 			t.activeBuffer.ClearRow(row)
 		}
 		t.activeBuffer.ClearRowRange(t.cursor.Row, 0, t.cursor.Col+1)
+		// Clear images that intersect with cleared region
+		t.images.DeletePlacementsAbove(t.cursor.Row)
 	case ansicode.ClearModeAll:
 		t.activeBuffer.ClearAll()
+		// Clear all image placements (CSI 2J behavior per Kitty/WezTerm)
+		t.images.ClearPlacements()
 	case ansicode.ClearModeSaved:
 		// Clear saved lines (scrollback) - not implemented for now
 		t.activeBuffer.ClearAll()
+		// Clear all image placements
+		t.images.ClearPlacements()
 	}
 }
 
@@ -1150,6 +1164,9 @@ func (t *Terminal) resetStateInternal() {
 	t.colors = make(map[int]color.Color)
 	t.keyboardModes = make([]ansicode.KeyboardMode, 0)
 	t.currentHyperlink = nil
+
+	// Clear all images AND image cache (RIS behavior per Kitty/WezTerm)
+	t.images.Clear()
 }
 
 // RestoreCursorPosition restores cursor position, attributes, and charset state from the saved cursor.
@@ -1484,9 +1501,13 @@ func (t *Terminal) setModeLocked(mode ansicode.TerminalMode, set bool) {
 			t.saveCursorPositionLocked()
 			t.activeBuffer = t.alternateBuffer
 			t.activeBuffer.ClearAll()
+			// Clear image placements when switching to alternate screen
+			t.images.ClearPlacements()
 		} else {
 			t.activeBuffer = t.primaryBuffer
 			t.restoreCursorPositionLocked()
+			// Clear image placements when switching back to primary screen
+			t.images.ClearPlacements()
 		}
 	case ansicode.TerminalModeBracketedPaste:
 		m = ModeBracketedPaste
@@ -1982,12 +2003,13 @@ func (t *Terminal) sixelReceivedInternal(params [][]uint16, data []byte) {
 
 	placementID := t.images.Place(placement)
 
-	// Assign image references to cells
+	// Assign image references to cells (may scroll and update placement.Row)
 	t.assignImageToCells(imageID, placementID, placement, img.Width, img.Height, cellWidth, cellHeight)
 
-	// Move cursor down by number of rows (Sixel behavior)
+	// Move cursor to the row after the image (Sixel behavior)
+	// Use placement.Row which was updated by assignImageToCells if scrolling occurred
 	t.mu.Lock()
-	t.cursor.Row += rows
+	t.cursor.Row = placement.Row + rows
 	if t.cursor.Row >= t.rows {
 		t.cursor.Row = t.rows - 1
 	}
@@ -2007,9 +2029,43 @@ func (t *Terminal) getCellSizePixels() (width, height int) {
 }
 
 // assignImageToCells assigns image references and placeholder characters to cells covered by a placement.
+// It scrolls the screen if necessary to make room for the image.
 func (t *Terminal) assignImageToCells(imageID, placementID uint32, p *ImagePlacement, imgW, imgH uint32, cellW, cellH int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
+
+	// Calculate how many rows would extend past the scroll bottom
+	endRow := p.Row + p.Rows
+	if endRow > t.scrollBottom {
+		// Need to scroll to make room
+		linesToScroll := endRow - t.scrollBottom
+		t.activeBuffer.ScrollUp(t.scrollTop, t.scrollBottom, linesToScroll)
+
+		// Adjust placement position to account for scroll
+		p.Row -= linesToScroll
+		if p.Row < t.scrollTop {
+			p.Row = t.scrollTop
+		}
+	}
+
+	// Calculate scale factors
+	// Total target size in pixels: p.Cols * cellW x p.Rows * cellH
+	// Source region size: p.SrcW x p.SrcH
+	// Scale = target / source
+	srcW := float32(p.SrcW)
+	srcH := float32(p.SrcH)
+	if srcW <= 0 {
+		srcW = float32(imgW)
+	}
+	if srcH <= 0 {
+		srcH = float32(imgH)
+	}
+
+	targetW := float32(p.Cols * cellW)
+	targetH := float32(p.Rows * cellH)
+
+	scaleX := targetW / srcW
+	scaleY := targetH / srcH
 
 	for row := 0; row < p.Rows; row++ {
 		for col := 0; col < p.Cols; col++ {
@@ -2021,10 +2077,11 @@ func (t *Terminal) assignImageToCells(imageID, placementID uint32, p *ImagePlace
 			}
 
 			// Calculate UV coordinates for this cell
-			u0 := float32(col*cellW) / float32(imgW)
-			v0 := float32(row*cellH) / float32(imgH)
-			u1 := float32((col+1)*cellW) / float32(imgW)
-			v1 := float32((row+1)*cellH) / float32(imgH)
+			// Each cell covers (1/Cols) x (1/Rows) of the source region
+			u0 := float32(col) / float32(p.Cols)
+			v0 := float32(row) / float32(p.Rows)
+			u1 := float32(col+1) / float32(p.Cols)
+			v1 := float32(row+1) / float32(p.Rows)
 
 			// Clamp to [0, 1]
 			if u1 > 1.0 {
@@ -2045,6 +2102,8 @@ func (t *Terminal) assignImageToCells(imageID, placementID uint32, p *ImagePlace
 					V0:          v0,
 					U1:          u1,
 					V1:          v1,
+					ScaleX:      scaleX,
+					ScaleY:      scaleY,
 					ZIndex:      p.ZIndex,
 				}
 				cell.MarkDirty()
