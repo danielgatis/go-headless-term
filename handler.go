@@ -20,7 +20,9 @@ func (t *Terminal) ApplicationCommandReceived(data []byte) {
 func (t *Terminal) applicationCommandReceivedInternal(data []byte) {
 	// Check for Kitty graphics protocol (starts with 'G')
 	if len(data) > 0 && data[0] == 'G' {
-		t.handleKittyGraphics(data)
+		if t.kittyEnabled {
+			t.handleKittyGraphics(data)
+		}
 		return
 	}
 
@@ -1960,6 +1962,11 @@ func (t *Terminal) SixelReceived(params [][]uint16, data []byte) {
 }
 
 func (t *Terminal) sixelReceivedInternal(params [][]uint16, data []byte) {
+	// Skip if Sixel is disabled
+	if !t.sixelEnabled {
+		return
+	}
+
 	// Convert params to int64 slice
 	var p []int64
 	for _, param := range params {

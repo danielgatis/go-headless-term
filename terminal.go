@@ -160,6 +160,10 @@ type Terminal struct {
 
 	// Image manager for Sixel and Kitty graphics
 	images *ImageManager
+
+	// Image protocol flags
+	sixelEnabled bool
+	kittyEnabled bool
 }
 
 // Option configures a Terminal during construction.
@@ -287,6 +291,34 @@ func WithSizeProvider(p SizeProvider) Option {
 	}
 }
 
+// WithSixel enables or disables Sixel graphics protocol support.
+// When disabled, Sixel sequences are ignored.
+// Default is true (enabled).
+func WithSixel(enabled bool) Option {
+	return func(t *Terminal) {
+		t.sixelEnabled = enabled
+	}
+}
+
+// WithKitty enables or disables Kitty graphics protocol support.
+// When disabled, Kitty graphics APC sequences are ignored.
+// Default is true (enabled).
+func WithKitty(enabled bool) Option {
+	return func(t *Terminal) {
+		t.kittyEnabled = enabled
+	}
+}
+
+// SixelEnabled returns true if Sixel graphics protocol is enabled.
+func (t *Terminal) SixelEnabled() bool {
+	return t.sixelEnabled
+}
+
+// KittyEnabled returns true if Kitty graphics protocol is enabled.
+func (t *Terminal) KittyEnabled() bool {
+	return t.kittyEnabled
+}
+
 // New creates a terminal with the given options.
 // Defaults to 24x80 with line wrap and cursor visible.
 func New(opts ...Option) *Terminal {
@@ -302,6 +334,8 @@ func New(opts ...Option) *Terminal {
 		sosProvider:       NoopSOS{},
 		clipboardProvider: NoopClipboard{},
 		recordingProvider: NoopRecording{},
+		sixelEnabled:      true,
+		kittyEnabled:      true,
 	}
 
 	for _, opt := range opts {
