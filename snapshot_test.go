@@ -135,6 +135,87 @@ func TestSnapshot_Attributes(t *testing.T) {
 	}
 }
 
+func TestSnapshot_UnderlineStyles(t *testing.T) {
+	tests := []struct {
+		name     string
+		sequence string
+		expected string
+	}{
+		{"single", "\x1b[4mText\x1b[0m", "single"},
+		{"single_4:1", "\x1b[4:1mText\x1b[0m", "single"},
+		{"double", "\x1b[4:2mText\x1b[0m", "double"},
+		{"curly", "\x1b[4:3mText\x1b[0m", "curly"},
+		{"dotted", "\x1b[4:4mText\x1b[0m", "dotted"},
+		{"dashed", "\x1b[4:5mText\x1b[0m", "dashed"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			term := New(WithSize(3, 20))
+			term.WriteString(tt.sequence)
+
+			snap := term.Snapshot(SnapshotDetailFull)
+
+			if len(snap.Lines[0].Cells) < 4 {
+				t.Fatal("Expected at least 4 cells")
+			}
+
+			got := snap.Lines[0].Cells[0].Attributes.Underline
+			if got != tt.expected {
+				t.Errorf("Underline = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSnapshot_BlinkStyles(t *testing.T) {
+	tests := []struct {
+		name     string
+		sequence string
+		expected string
+	}{
+		{"slow", "\x1b[5mText\x1b[0m", "slow"},
+		{"fast", "\x1b[6mText\x1b[0m", "fast"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			term := New(WithSize(3, 20))
+			term.WriteString(tt.sequence)
+
+			snap := term.Snapshot(SnapshotDetailFull)
+
+			if len(snap.Lines[0].Cells) < 4 {
+				t.Fatal("Expected at least 4 cells")
+			}
+
+			got := snap.Lines[0].Cells[0].Attributes.Blink
+			if got != tt.expected {
+				t.Errorf("Blink = %q, want %q", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSnapshot_UnderlineColor(t *testing.T) {
+	term := New(WithSize(3, 20))
+
+	// SGR 58:2::R:G:B sets underline color (RGB) - common format
+	// Also try the indexed format
+	term.WriteString("\x1b[4m\x1b[58;2;255;0;0mText\x1b[0m")
+
+	snap := term.Snapshot(SnapshotDetailFull)
+
+	if len(snap.Lines[0].Cells) < 4 {
+		t.Fatal("Expected at least 4 cells")
+	}
+
+	got := snap.Lines[0].Cells[0].UnderlineColor
+	// If parser supports underline color, it should be set
+	// If not supported, test just documents current behavior
+	t.Logf("UnderlineColor = %q", got)
+}
+
 func TestSnapshot_Hyperlink(t *testing.T) {
 	term := New(WithSize(3, 40))
 

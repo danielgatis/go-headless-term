@@ -81,9 +81,20 @@ const (
 	NamedColorDimForeground    = 268 // Dim foreground
 )
 
-// resolveDefaultColor converts a color.Color to RGBA using the default palette.
-// If c is nil, returns the default foreground or background based on fg.
+// ResolveDefaultColor converts a color.Color to RGBA using the default palette.
+// If c is nil, returns the default foreground or background based on the fg parameter.
 // IndexedColor and NamedColor are resolved using DefaultPalette.
+//
+// Example:
+//
+//	cell := term.Cell(0, 0)
+//	fgColor := headlessterm.ResolveDefaultColor(cell.Fg, true)
+//	bgColor := headlessterm.ResolveDefaultColor(cell.Bg, false)
+func ResolveDefaultColor(c color.Color, fg bool) color.RGBA {
+	return resolveDefaultColor(c, fg)
+}
+
+// resolveDefaultColor is the internal implementation.
 func resolveDefaultColor(c color.Color, fg bool) color.RGBA {
 	if c == nil {
 		if fg {

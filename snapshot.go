@@ -49,34 +49,49 @@ type SnapshotLine struct {
 
 // SnapshotSegment represents a styled text segment within a line.
 type SnapshotSegment struct {
-	Text       string         `json:"text"`
-	Fg         string         `json:"fg,omitempty"`
-	Bg         string         `json:"bg,omitempty"`
-	Attributes SnapshotAttrs  `json:"attrs,omitempty"`
-	Hyperlink  *SnapshotLink  `json:"hyperlink,omitempty"`
+	Text           string         `json:"text"`
+	Fg             string         `json:"fg,omitempty"`
+	Bg             string         `json:"bg,omitempty"`
+	UnderlineColor string         `json:"underline_color,omitempty"`
+	Attributes     SnapshotAttrs  `json:"attrs,omitempty"`
+	Hyperlink      *SnapshotLink  `json:"hyperlink,omitempty"`
 }
 
 // SnapshotCell represents a single cell with full attributes.
 type SnapshotCell struct {
-	Char       string         `json:"char"`
-	Fg         string         `json:"fg"`
-	Bg         string         `json:"bg"`
-	Attributes SnapshotAttrs  `json:"attrs,omitempty"`
-	Hyperlink  *SnapshotLink  `json:"hyperlink,omitempty"`
-	Wide       bool           `json:"wide,omitempty"`
-	WideSpacer bool           `json:"wide_spacer,omitempty"`
+	Char           string            `json:"char"`
+	Fg             string            `json:"fg"`
+	Bg             string            `json:"bg"`
+	UnderlineColor string            `json:"underline_color,omitempty"`
+	Attributes     SnapshotAttrs     `json:"attrs,omitempty"`
+	Hyperlink      *SnapshotLink     `json:"hyperlink,omitempty"`
+	Image          *SnapshotCellImage `json:"image,omitempty"`
+	Wide           bool              `json:"wide,omitempty"`
+	WideSpacer     bool              `json:"wide_spacer,omitempty"`
+}
+
+// SnapshotCellImage holds image reference information for a cell.
+type SnapshotCellImage struct {
+	ImageID     uint32  `json:"image_id"`
+	PlacementID uint32  `json:"placement_id"`
+	U0          float32 `json:"u0"` // Texture coordinates
+	V0          float32 `json:"v0"`
+	U1          float32 `json:"u1"`
+	V1          float32 `json:"v1"`
+	ScaleX      float32 `json:"scale_x"`
+	ScaleY      float32 `json:"scale_y"`
 }
 
 // SnapshotAttrs holds text formatting attributes.
 type SnapshotAttrs struct {
-	Bold          bool `json:"bold,omitempty"`
-	Dim           bool `json:"dim,omitempty"`
-	Italic        bool `json:"italic,omitempty"`
-	Underline     bool `json:"underline,omitempty"`
-	Blink         bool `json:"blink,omitempty"`
-	Reverse       bool `json:"reverse,omitempty"`
-	Hidden        bool `json:"hidden,omitempty"`
-	Strikethrough bool `json:"strikethrough,omitempty"`
+	Bold          bool   `json:"bold,omitempty"`
+	Dim           bool   `json:"dim,omitempty"`
+	Italic        bool   `json:"italic,omitempty"`
+	Underline     string `json:"underline,omitempty"` // "", "single", "double", "curly", "dotted", "dashed"
+	Blink         string `json:"blink,omitempty"`     // "", "slow", "fast"
+	Reverse       bool   `json:"reverse,omitempty"`
+	Hidden        bool   `json:"hidden,omitempty"`
+	Strikethrough bool   `json:"strikethrough,omitempty"`
 }
 
 // SnapshotLink holds hyperlink information.
@@ -223,11 +238,12 @@ func (t *Terminal) lineToSegments(row int) []SnapshotSegment {
 
 		fg := colorToHex(cell.Fg)
 		bg := colorToHex(cell.Bg)
+		underlineColor := colorToHex(cell.UnderlineColor)
 		attrs := cellAttrsToSnapshot(cell)
 		link := cellHyperlinkToSnapshot(cell)
 
 		// Check if we need to start a new segment
-		if current == nil || !segmentMatches(current, fg, bg, attrs, link) {
+		if current == nil || !segmentMatches(current, fg, bg, underlineColor, attrs, link) {
 			// Save current segment if exists
 			if current != nil && len(currentChars) > 0 {
 				current.Text = string(currentChars)
@@ -236,10 +252,11 @@ func (t *Terminal) lineToSegments(row int) []SnapshotSegment {
 
 			// Start new segment
 			current = &SnapshotSegment{
-				Fg:         fg,
-				Bg:         bg,
-				Attributes: attrs,
-				Hyperlink:  link,
+				Fg:             fg,
+				Bg:             bg,
+				UnderlineColor: underlineColor,
+				Attributes:     attrs,
+				Hyperlink:      link,
 			}
 			currentChars = nil
 		}
@@ -281,13 +298,15 @@ func (t *Terminal) lineToCells(row int) []SnapshotCell {
 		}
 
 		sc := SnapshotCell{
-			Char:       string(ch),
-			Fg:         colorToHex(cell.Fg),
-			Bg:         colorToHex(cell.Bg),
-			Attributes: cellAttrsToSnapshot(cell),
-			Hyperlink:  cellHyperlinkToSnapshot(cell),
-			Wide:       cell.IsWide(),
-			WideSpacer: cell.IsWideSpacer(),
+			Char:           string(ch),
+			Fg:             colorToHex(cell.Fg),
+			Bg:             colorToHex(cell.Bg),
+			UnderlineColor: colorToHex(cell.UnderlineColor),
+			Attributes:     cellAttrsToSnapshot(cell),
+			Hyperlink:      cellHyperlinkToSnapshot(cell),
+			Image:          cellImageToSnapshot(cell),
+			Wide:           cell.IsWide(),
+			WideSpacer:     cell.IsWideSpacer(),
 		}
 
 		cells = append(cells, sc)
@@ -296,9 +315,26 @@ func (t *Terminal) lineToCells(row int) []SnapshotCell {
 	return cells
 }
 
+// cellImageToSnapshot extracts cell image info.
+func cellImageToSnapshot(cell *Cell) *SnapshotCellImage {
+	if cell.Image == nil {
+		return nil
+	}
+	return &SnapshotCellImage{
+		ImageID:     cell.Image.ImageID,
+		PlacementID: cell.Image.PlacementID,
+		U0:          cell.Image.U0,
+		V0:          cell.Image.V0,
+		U1:          cell.Image.U1,
+		V1:          cell.Image.V1,
+		ScaleX:      cell.Image.ScaleX,
+		ScaleY:      cell.Image.ScaleY,
+	}
+}
+
 // segmentMatches checks if segment matches the given style.
-func segmentMatches(seg *SnapshotSegment, fg, bg string, attrs SnapshotAttrs, link *SnapshotLink) bool {
-	if seg.Fg != fg || seg.Bg != bg {
+func segmentMatches(seg *SnapshotSegment, fg, bg, underlineColor string, attrs SnapshotAttrs, link *SnapshotLink) bool {
+	if seg.Fg != fg || seg.Bg != bg || seg.UnderlineColor != underlineColor {
 		return false
 	}
 	if seg.Attributes != attrs {
@@ -326,16 +362,37 @@ func colorToHex(c color.Color) string {
 
 // cellAttrsToSnapshot extracts cell attributes.
 func cellAttrsToSnapshot(cell *Cell) SnapshotAttrs {
-	return SnapshotAttrs{
+	attrs := SnapshotAttrs{
 		Bold:          cell.HasFlag(CellFlagBold),
 		Dim:           cell.HasFlag(CellFlagDim),
 		Italic:        cell.HasFlag(CellFlagItalic),
-		Underline:     cell.HasFlag(CellFlagUnderline) || cell.HasFlag(CellFlagDoubleUnderline) || cell.HasFlag(CellFlagCurlyUnderline) || cell.HasFlag(CellFlagDottedUnderline) || cell.HasFlag(CellFlagDashedUnderline),
-		Blink:         cell.HasFlag(CellFlagBlinkSlow) || cell.HasFlag(CellFlagBlinkFast),
 		Reverse:       cell.HasFlag(CellFlagReverse),
 		Hidden:        cell.HasFlag(CellFlagHidden),
 		Strikethrough: cell.HasFlag(CellFlagStrike),
 	}
+
+	// Determine underline style
+	switch {
+	case cell.HasFlag(CellFlagCurlyUnderline):
+		attrs.Underline = "curly"
+	case cell.HasFlag(CellFlagDoubleUnderline):
+		attrs.Underline = "double"
+	case cell.HasFlag(CellFlagDottedUnderline):
+		attrs.Underline = "dotted"
+	case cell.HasFlag(CellFlagDashedUnderline):
+		attrs.Underline = "dashed"
+	case cell.HasFlag(CellFlagUnderline):
+		attrs.Underline = "single"
+	}
+
+	// Determine blink type
+	if cell.HasFlag(CellFlagBlinkFast) {
+		attrs.Blink = "fast"
+	} else if cell.HasFlag(CellFlagBlinkSlow) {
+		attrs.Blink = "slow"
+	}
+
+	return attrs
 }
 
 // cellHyperlinkToSnapshot extracts hyperlink info.

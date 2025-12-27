@@ -132,6 +132,112 @@ func (NoopScrollback) Clear()                {}
 func (NoopScrollback) SetMaxLines(max int)   {}
 func (NoopScrollback) MaxLines() int         { return 0 }
 
+// MemoryScrollback stores scrollback lines in memory with a configurable limit.
+// When the limit is reached, the oldest lines are removed to make room for new ones.
+//
+// Example:
+//
+//	storage := headlessterm.NewMemoryScrollback(10000)
+//	term := headlessterm.New(headlessterm.WithScrollback(storage))
+type MemoryScrollback struct {
+	lines    [][]Cell
+	maxLines int
+}
+
+// NewMemoryScrollback creates a new in-memory scrollback buffer with the given capacity.
+// If maxLines is 0, scrollback is unlimited (be careful with memory usage).
+func NewMemoryScrollback(maxLines int) *MemoryScrollback {
+	return &MemoryScrollback{
+		lines:    make([][]Cell, 0),
+		maxLines: maxLines,
+	}
+}
+
+// Push appends a line to scrollback. If maxLines is exceeded, the oldest line is removed.
+func (m *MemoryScrollback) Push(line []Cell) {
+	// Make a copy to prevent external modifications
+	lineCopy := make([]Cell, len(line))
+	copy(lineCopy, line)
+
+	m.lines = append(m.lines, lineCopy)
+
+	// Trim oldest lines if over capacity
+	if m.maxLines > 0 && len(m.lines) > m.maxLines {
+		excess := len(m.lines) - m.maxLines
+		m.lines = m.lines[excess:]
+	}
+}
+
+// Len returns the current number of stored lines.
+func (m *MemoryScrollback) Len() int {
+	return len(m.lines)
+}
+
+// Line returns the line at index, where 0 is the oldest line.
+// Returns nil if index is out of range.
+func (m *MemoryScrollback) Line(index int) []Cell {
+	if index < 0 || index >= len(m.lines) {
+		return nil
+	}
+	return m.lines[index]
+}
+
+// Clear removes all stored lines.
+func (m *MemoryScrollback) Clear() {
+	m.lines = make([][]Cell, 0)
+}
+
+// SetMaxLines sets the maximum capacity. If the current length exceeds the new max,
+// the oldest lines are removed.
+func (m *MemoryScrollback) SetMaxLines(max int) {
+	m.maxLines = max
+	if max > 0 && len(m.lines) > max {
+		excess := len(m.lines) - max
+		m.lines = m.lines[excess:]
+	}
+}
+
+// MaxLines returns the current maximum capacity.
+func (m *MemoryScrollback) MaxLines() int {
+	return m.maxLines
+}
+
+// MemoryRecording stores raw input bytes in memory for replay or debugging.
+//
+// Example:
+//
+//	recorder := headlessterm.NewMemoryRecording()
+//	term := headlessterm.New(headlessterm.WithRecording(recorder))
+//	// ... process terminal output ...
+//	data := recorder.Data() // Get all recorded bytes
+type MemoryRecording struct {
+	data []byte
+}
+
+// NewMemoryRecording creates a new in-memory recording buffer.
+func NewMemoryRecording() *MemoryRecording {
+	return &MemoryRecording{
+		data: make([]byte, 0),
+	}
+}
+
+// Record appends raw bytes to the recording.
+func (r *MemoryRecording) Record(data []byte) {
+	r.data = append(r.data, data...)
+}
+
+// Data returns all captured bytes since the last Clear call.
+func (r *MemoryRecording) Data() []byte {
+	result := make([]byte, len(r.data))
+	copy(result, r.data)
+	return result
+}
+
+// Clear discards all recorded data.
+func (r *MemoryRecording) Clear() {
+	r.data = make([]byte, 0)
+}
+
 // --- Recording Provider ---
 
 // RecordingProvider captures raw input bytes before ANSI parsing for replay or debugging.
@@ -175,5 +281,7 @@ var _ PMProvider = (*NoopPM)(nil)
 var _ SOSProvider = (*NoopSOS)(nil)
 var _ ClipboardProvider = (*NoopClipboard)(nil)
 var _ ScrollbackProvider = (*NoopScrollback)(nil)
+var _ ScrollbackProvider = (*MemoryScrollback)(nil)
 var _ RecordingProvider = (*NoopRecording)(nil)
+var _ RecordingProvider = (*MemoryRecording)(nil)
 var _ SizeProvider = (*NoopSizeProvider)(nil)
