@@ -1595,6 +1595,28 @@ func (t *Terminal) startOfStringReceivedInternal(data []byte) {
 	}
 }
 
+// DesktopNotification handles OSC 99 desktop notification sequences (Kitty protocol).
+// It delegates to the configured NotificationProvider if present.
+// Responses from the provider (e.g., for query requests) are written back to the terminal.
+func (t *Terminal) DesktopNotification(payload *NotificationPayload) {
+	if t.middleware != nil && t.middleware.DesktopNotification != nil {
+		t.middleware.DesktopNotification(payload, t.desktopNotificationInternal)
+		return
+	}
+	t.desktopNotificationInternal(payload)
+}
+
+func (t *Terminal) desktopNotificationInternal(payload *NotificationPayload) {
+	if t.notificationProvider == nil {
+		return
+	}
+
+	response := t.notificationProvider.Notify(payload)
+	if response != "" {
+		t.writeResponseString(response)
+	}
+}
+
 // SetTerminalCharAttribute applies SGR attributes to the cell template (colors, bold, underline, etc.).
 func (t *Terminal) SetTerminalCharAttribute(attr ansicode.TerminalCharAttribute) {
 	if t.middleware != nil && t.middleware.SetTerminalCharAttribute != nil {

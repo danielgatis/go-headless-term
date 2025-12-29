@@ -152,6 +152,7 @@ Configure terminal at creation:
 - `WithBell(provider)`: Handler for bell events
 - `WithTitle(provider)`: Handler for title changes
 - `WithClipboard(provider)`: Handler for OSC 52 clipboard
+- `WithNotification(provider)`: Handler for OSC 99 desktop notifications (Kitty protocol)
 - `WithMiddleware(mw)`: Intercept handler calls
 
 ### Providers
@@ -162,6 +163,7 @@ Interfaces for external events (all optional, default to no-ops):
 - `ClipboardProvider`: Called on OSC 52 (clipboard read/write)
 - `ScrollbackProvider`: Stores lines scrolled off top
 - `RecordingProvider`: Captures raw input bytes
+- `NotificationProvider`: Called on OSC 99 (desktop notifications, Kitty protocol)
 
 ### Dirty tracking
 
@@ -171,6 +173,40 @@ Cells track modification state:
 - `ClearDirty()`: Reset tracking
 
 Useful for incremental rendering (only redraw changed cells).
+
+### Desktop Notifications (OSC 99)
+
+The terminal supports the Kitty desktop notification protocol (OSC 99). Implement `NotificationProvider` to handle notifications:
+
+```go
+type MyNotificationHandler struct{}
+
+func (h *MyNotificationHandler) Notify(payload *headlessterm.NotificationPayload) string {
+    // Handle the notification
+    fmt.Printf("Notification: %s\n", string(payload.Data))
+
+    // For query requests, return capabilities
+    if payload.PayloadType == "?" {
+        return "\x1b]99;i=test;p=title:body\x1b\\"
+    }
+    return ""
+}
+
+term := headlessterm.New(
+    headlessterm.WithNotification(&MyNotificationHandler{}),
+)
+```
+
+The `NotificationPayload` contains:
+- `ID`: Unique identifier for chunking/tracking
+- `PayloadType`: Type of data ("title", "body", "icon", "?", etc.)
+- `Data`: Payload content (decoded if base64)
+- `Urgency`: 0 (low), 1 (normal), 2 (critical)
+- `Sound`: Notification sound ("system", "silent", etc.)
+- `Actions`: Click behavior ("focus", "report")
+- And more fields for icons, timeouts, app name, etc.
+
+See [Kitty Desktop Notifications](https://sw.kovidgoyal.net/kitty/desktop-notifications/) for protocol details.
 
 ## Buy me a coffee
 

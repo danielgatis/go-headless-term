@@ -164,6 +164,9 @@ type Terminal struct {
 	// Image protocol flags
 	sixelEnabled bool
 	kittyEnabled bool
+
+	// Notification provider for OSC 99 (Kitty desktop notifications)
+	notificationProvider NotificationProvider
 }
 
 // Option configures a Terminal during construction.
@@ -309,6 +312,18 @@ func WithKitty(enabled bool) Option {
 	}
 }
 
+// WithNotification sets the handler for OSC 99 desktop notifications (Kitty protocol).
+// The provider receives notification payloads and can display native desktop notifications.
+// Query requests (PayloadType == "?") should return a capability string that is written back to the terminal.
+// Defaults to a no-op if not set.
+//
+// See: https://sw.kovidgoyal.net/kitty/desktop-notifications/
+func WithNotification(p NotificationProvider) Option {
+	return func(t *Terminal) {
+		t.notificationProvider = p
+	}
+}
+
 // SixelEnabled returns true if Sixel graphics protocol is enabled.
 func (t *Terminal) SixelEnabled() bool {
 	return t.sixelEnabled
@@ -323,19 +338,20 @@ func (t *Terminal) KittyEnabled() bool {
 // Defaults to 24x80 with line wrap and cursor visible.
 func New(opts ...Option) *Terminal {
 	t := &Terminal{
-		rows:              DEFAULT_ROWS,
-		cols:              DEFAULT_COLS,
-		colors:            make(map[int]color.Color),
-		keyboardModes:     make([]ansicode.KeyboardMode, 0),
-		bellProvider:      NoopBell{},
-		titleProvider:     NoopTitle{},
-		apcProvider:       NoopAPC{},
-		pmProvider:        NoopPM{},
-		sosProvider:       NoopSOS{},
-		clipboardProvider: NoopClipboard{},
-		recordingProvider: NoopRecording{},
-		sixelEnabled:      true,
-		kittyEnabled:      true,
+		rows:                 DEFAULT_ROWS,
+		cols:                 DEFAULT_COLS,
+		colors:               make(map[int]color.Color),
+		keyboardModes:        make([]ansicode.KeyboardMode, 0),
+		bellProvider:         NoopBell{},
+		titleProvider:        NoopTitle{},
+		apcProvider:          NoopAPC{},
+		pmProvider:           NoopPM{},
+		sosProvider:          NoopSOS{},
+		clipboardProvider:    NoopClipboard{},
+		recordingProvider:    NoopRecording{},
+		notificationProvider: NoopNotification{},
+		sixelEnabled:         true,
+		kittyEnabled:         true,
 	}
 
 	for _, opt := range opts {
@@ -626,6 +642,20 @@ func (t *Terminal) ClipboardProvider() ClipboardProvider {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	return t.clipboardProvider
+}
+
+// SetNotificationProvider sets the notification provider at runtime.
+func (t *Terminal) SetNotificationProvider(p NotificationProvider) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.notificationProvider = p
+}
+
+// NotificationProvider returns the current notification provider.
+func (t *Terminal) NotificationProvider() NotificationProvider {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.notificationProvider
 }
 
 // SetMiddleware sets the middleware at runtime.

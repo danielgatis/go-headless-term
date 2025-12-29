@@ -212,6 +212,9 @@ type Middleware struct {
 
 	// SixelReceived wraps the SixelReceived handler
 	SixelReceived func(params [][]uint16, data []byte, next func([][]uint16, []byte))
+
+	// DesktopNotification wraps the DesktopNotification handler (OSC 99)
+	DesktopNotification func(payload *NotificationPayload, next func(*NotificationPayload))
 }
 
 // Merge copies non-nil middleware functions from other into this, overwriting existing values.
@@ -423,5 +426,8 @@ func (m *Middleware) Merge(other *Middleware) {
 	}
 	if other.SixelReceived != nil {
 		m.SixelReceived = other.SixelReceived
+	}
+	if other.DesktopNotification != nil {
+		m.DesktopNotification = other.DesktopNotification
 	}
 }

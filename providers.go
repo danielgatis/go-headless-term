@@ -1,6 +1,14 @@
 package headlessterm
 
-import "io"
+import (
+	"io"
+
+	"github.com/danielgatis/go-ansicode"
+)
+
+// NotificationPayload is re-exported from go-ansicode for use by notification providers.
+// This allows consumers to implement NotificationProvider without importing go-ansicode directly.
+type NotificationPayload = ansicode.NotificationPayload
 
 // ResponseProvider writes terminal responses (e.g., cursor position reports) back to the PTY.
 // Typically an io.Writer connected to the PTY input.
@@ -273,6 +281,40 @@ type NoopSizeProvider struct{}
 func (NoopSizeProvider) WindowSizePixels() (width, height int) { return 800, 600 }
 func (NoopSizeProvider) CellSizePixels() (width, height int)   { return 10, 20 }
 
+// --- Notification Provider ---
+
+// NotificationProvider handles OSC 99 desktop notifications (Kitty protocol).
+// Implementations can display native desktop notifications, log them, or process them
+// in any other way appropriate for the platform.
+//
+// The Kitty notification protocol supports:
+//   - Title and body text
+//   - Urgency levels (low, normal, critical)
+//   - Icons (by name or PNG data)
+//   - Sound control (system, silent, error, etc.)
+//   - Chunking for large payloads
+//   - Query mechanism for capability discovery
+//   - Close tracking for notification lifecycle
+//
+// Note: Buttons are NOT supported (same as Kitty on macOS). Applications
+// that query capabilities will see buttons are not reported, and button
+// payloads are silently ignored.
+//
+// See: https://sw.kovidgoyal.net/kitty/desktop-notifications/
+type NotificationProvider interface {
+	// Notify processes a notification payload and optionally returns a response.
+	// For query requests (PayloadType == "?"), implementations should return
+	// a string describing supported capabilities in OSC 99 format.
+	// For other requests, return empty string.
+	Notify(payload *NotificationPayload) string
+}
+
+// NoopNotification ignores all notification events.
+type NoopNotification struct{}
+
+// Notify discards the notification and returns no response.
+func (NoopNotification) Notify(payload *NotificationPayload) string { return "" }
+
 // Ensure implementations satisfy their interfaces
 var _ BellProvider = (*NoopBell)(nil)
 var _ TitleProvider = (*NoopTitle)(nil)
@@ -285,3 +327,4 @@ var _ ScrollbackProvider = (*MemoryScrollback)(nil)
 var _ RecordingProvider = (*NoopRecording)(nil)
 var _ RecordingProvider = (*MemoryRecording)(nil)
 var _ SizeProvider = (*NoopSizeProvider)(nil)
+var _ NotificationProvider = (*NoopNotification)(nil)
