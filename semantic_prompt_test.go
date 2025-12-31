@@ -6,7 +6,7 @@ import (
 	"github.com/danielgatis/go-ansicode"
 )
 
-func TestShellIntegrationMark_PromptStart(t *testing.T) {
+func TestSemanticPromptMark_PromptStart(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// OSC 133 ; A BEL - Prompt start
@@ -25,7 +25,7 @@ func TestShellIntegrationMark_PromptStart(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_CommandStart(t *testing.T) {
+func TestSemanticPromptMark_CommandStart(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// OSC 133 ; B BEL - Command start
@@ -41,7 +41,7 @@ func TestShellIntegrationMark_CommandStart(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_CommandExecuted(t *testing.T) {
+func TestSemanticPromptMark_CommandExecuted(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// OSC 133 ; C BEL - Command executed
@@ -57,7 +57,7 @@ func TestShellIntegrationMark_CommandExecuted(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_CommandFinished(t *testing.T) {
+func TestSemanticPromptMark_CommandFinished(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// OSC 133 ; D BEL - Command finished (no exit code)
@@ -76,7 +76,7 @@ func TestShellIntegrationMark_CommandFinished(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_CommandFinishedWithExitCode(t *testing.T) {
+func TestSemanticPromptMark_CommandFinishedWithExitCode(t *testing.T) {
 	tests := []struct {
 		name     string
 		input    string
@@ -104,7 +104,7 @@ func TestShellIntegrationMark_CommandFinishedWithExitCode(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_FullSequence(t *testing.T) {
+func TestSemanticPromptMark_FullSequence(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// Simulate a full shell prompt cycle
@@ -142,7 +142,7 @@ func TestShellIntegrationMark_FullSequence(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_RowTracking(t *testing.T) {
+func TestSemanticPromptMark_RowTracking(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// Add marks at different rows
@@ -169,7 +169,7 @@ func TestShellIntegrationMark_RowTracking(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_NextPromptRow(t *testing.T) {
+func TestSemanticPromptMark_NextPromptRow(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// Add prompts at different absolute rows
@@ -204,7 +204,7 @@ func TestShellIntegrationMark_NextPromptRow(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_PrevPromptRow(t *testing.T) {
+func TestSemanticPromptMark_PrevPromptRow(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// Add prompts at different absolute rows
@@ -239,7 +239,7 @@ func TestShellIntegrationMark_PrevPromptRow(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_FilterByType(t *testing.T) {
+func TestSemanticPromptMark_FilterByType(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// Add different mark types at absolute rows
@@ -263,7 +263,7 @@ func TestShellIntegrationMark_FilterByType(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_ClearMarks(t *testing.T) {
+func TestSemanticPromptMark_ClearMarks(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	term.WriteString("\x1b]133;A\x07")
@@ -280,7 +280,7 @@ func TestShellIntegrationMark_ClearMarks(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_GetMarkAt(t *testing.T) {
+func TestSemanticPromptMark_GetMarkAt(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	term.WriteString("\x1b]133;A\x07")  // Absolute row 0
@@ -301,39 +301,39 @@ func TestShellIntegrationMark_GetMarkAt(t *testing.T) {
 	}
 }
 
-type testShellIntegrationProvider struct {
+type testSemanticPromptHandler struct {
 	marks []ansicode.ShellIntegrationMark
 	codes []int
 }
 
-func (p *testShellIntegrationProvider) OnMark(mark ansicode.ShellIntegrationMark, exitCode int) {
+func (p *testSemanticPromptHandler) OnMark(mark ansicode.ShellIntegrationMark, exitCode int) {
 	p.marks = append(p.marks, mark)
 	p.codes = append(p.codes, exitCode)
 }
 
-func TestShellIntegrationMark_Provider(t *testing.T) {
-	provider := &testShellIntegrationProvider{}
-	term := New(WithSize(24, 80), WithShellIntegration(provider))
+func TestSemanticPromptMark_Handler(t *testing.T) {
+	handler := &testSemanticPromptHandler{}
+	term := New(WithSize(24, 80), WithSemanticPromptHandler(handler))
 
 	term.WriteString("\x1b]133;A\x07")
 	term.WriteString("\x1b]133;D;42\x07")
 
-	if len(provider.marks) != 2 {
-		t.Fatalf("expected provider to receive 2 marks, got %d", len(provider.marks))
+	if len(handler.marks) != 2 {
+		t.Fatalf("expected handler to receive 2 marks, got %d", len(handler.marks))
 	}
 
-	if provider.marks[0] != ansicode.PromptStart {
-		t.Errorf("expected PromptStart, got %d", provider.marks[0])
+	if handler.marks[0] != ansicode.PromptStart {
+		t.Errorf("expected PromptStart, got %d", handler.marks[0])
 	}
-	if provider.marks[1] != ansicode.CommandFinished {
-		t.Errorf("expected CommandFinished, got %d", provider.marks[1])
+	if handler.marks[1] != ansicode.CommandFinished {
+		t.Errorf("expected CommandFinished, got %d", handler.marks[1])
 	}
-	if provider.codes[1] != 42 {
-		t.Errorf("expected exit code 42, got %d", provider.codes[1])
+	if handler.codes[1] != 42 {
+		t.Errorf("expected exit code 42, got %d", handler.codes[1])
 	}
 }
 
-func TestShellIntegrationMark_ST_Terminator(t *testing.T) {
+func TestSemanticPromptMark_ST_Terminator(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// OSC 133 ; A ST (using ESC \ as string terminator)
@@ -349,13 +349,13 @@ func TestShellIntegrationMark_ST_Terminator(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_Middleware(t *testing.T) {
+func TestSemanticPromptMark_Middleware(t *testing.T) {
 	var middlewareCalled bool
 	var receivedMark ansicode.ShellIntegrationMark
 	var receivedExitCode int
 
 	mw := &Middleware{
-		ShellIntegrationMark: func(mark ansicode.ShellIntegrationMark, exitCode int, next func(ansicode.ShellIntegrationMark, int)) {
+		SemanticPromptMark: func(mark ansicode.ShellIntegrationMark, exitCode int, next func(ansicode.ShellIntegrationMark, int)) {
 			middlewareCalled = true
 			receivedMark = mark
 			receivedExitCode = exitCode
@@ -515,12 +515,12 @@ func TestGetLastCommandOutput_TrailingEmptyLines(t *testing.T) {
 
 // --- Scrollback Tests for Absolute Row Functions ---
 
-type testScrollbackForShellIntegration struct {
+type testScrollbackForSemanticPrompt struct {
 	lines    [][]Cell
 	maxLines int
 }
 
-func (s *testScrollbackForShellIntegration) Push(line []Cell) {
+func (s *testScrollbackForSemanticPrompt) Push(line []Cell) {
 	lineCopy := make([]Cell, len(line))
 	copy(lineCopy, line)
 	s.lines = append(s.lines, lineCopy)
@@ -529,31 +529,31 @@ func (s *testScrollbackForShellIntegration) Push(line []Cell) {
 	}
 }
 
-func (s *testScrollbackForShellIntegration) Len() int {
+func (s *testScrollbackForSemanticPrompt) Len() int {
 	return len(s.lines)
 }
 
-func (s *testScrollbackForShellIntegration) Line(index int) []Cell {
+func (s *testScrollbackForSemanticPrompt) Line(index int) []Cell {
 	if index < 0 || index >= len(s.lines) {
 		return nil
 	}
 	return s.lines[index]
 }
 
-func (s *testScrollbackForShellIntegration) SetMaxLines(n int) {
+func (s *testScrollbackForSemanticPrompt) SetMaxLines(n int) {
 	s.maxLines = n
 }
 
-func (s *testScrollbackForShellIntegration) Clear() {
+func (s *testScrollbackForSemanticPrompt) Clear() {
 	s.lines = nil
 }
 
-func (s *testScrollbackForShellIntegration) MaxLines() int {
+func (s *testScrollbackForSemanticPrompt) MaxLines() int {
 	return s.maxLines
 }
 
-func TestShellIntegrationMark_NextPromptRowWithScrollback(t *testing.T) {
-	storage := &testScrollbackForShellIntegration{lines: make([][]Cell, 0)}
+func TestSemanticPromptMark_NextPromptRowWithScrollback(t *testing.T) {
+	storage := &testScrollbackForSemanticPrompt{lines: make([][]Cell, 0)}
 	storage.SetMaxLines(100)
 
 	// Create a small terminal (5 rows) to force scrollback
@@ -605,8 +605,8 @@ func TestShellIntegrationMark_NextPromptRowWithScrollback(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_PrevPromptRowWithScrollback(t *testing.T) {
-	storage := &testScrollbackForShellIntegration{lines: make([][]Cell, 0)}
+func TestSemanticPromptMark_PrevPromptRowWithScrollback(t *testing.T) {
+	storage := &testScrollbackForSemanticPrompt{lines: make([][]Cell, 0)}
 	storage.SetMaxLines(100)
 
 	term := New(WithSize(5, 80), WithScrollback(storage))
@@ -642,8 +642,8 @@ func TestShellIntegrationMark_PrevPromptRowWithScrollback(t *testing.T) {
 	}
 }
 
-func TestShellIntegrationMark_GetMarkAtWithScrollback(t *testing.T) {
-	storage := &testScrollbackForShellIntegration{lines: make([][]Cell, 0)}
+func TestSemanticPromptMark_GetMarkAtWithScrollback(t *testing.T) {
+	storage := &testScrollbackForSemanticPrompt{lines: make([][]Cell, 0)}
 	storage.SetMaxLines(100)
 
 	term := New(WithSize(5, 80), WithScrollback(storage))

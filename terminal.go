@@ -148,8 +148,8 @@ type Terminal struct {
 	// Recording provider for capturing raw input
 	recordingProvider RecordingProvider
 
-	// Shell integration
-	shellIntegrationProvider ShellIntegrationProvider
+	// Semantic prompt handler (OSC 133)
+	semanticPromptHandler SemanticPromptHandler
 	promptMarks              []PromptMark
 
 	// Working directory (OSC 7)
@@ -280,10 +280,10 @@ func WithRecording(p RecordingProvider) Option {
 	}
 }
 
-// WithShellIntegration sets the handler for shell integration events (OSC 133).
-func WithShellIntegration(p ShellIntegrationProvider) Option {
+// WithSemanticPromptHandler sets the handler for semantic prompt events (OSC 133).
+func WithSemanticPromptHandler(h SemanticPromptHandler) Option {
 	return func(t *Terminal) {
-		t.shellIntegrationProvider = p
+		t.semanticPromptHandler = h
 	}
 }
 

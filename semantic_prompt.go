@@ -4,7 +4,7 @@ import (
 	"github.com/danielgatis/go-ansicode"
 )
 
-// PromptMark stores information about a shell integration mark (OSC 133).
+// PromptMark stores information about a semantic prompt mark (OSC 133).
 // Used for prompt-based navigation in scrollback.
 type PromptMark struct {
 	// Type is the mark type (PromptStart, CommandStart, CommandExecuted, CommandFinished).
@@ -16,31 +16,32 @@ type PromptMark struct {
 	ExitCode int
 }
 
-// ShellIntegrationProvider handles shell integration events (OSC 133).
-type ShellIntegrationProvider interface {
-	// OnMark is called when a shell integration mark is received.
+// SemanticPromptHandler handles semantic prompt events (OSC 133).
+type SemanticPromptHandler interface {
+	// OnMark is called when a semantic prompt mark is received.
 	OnMark(mark ansicode.ShellIntegrationMark, exitCode int)
 }
 
-// NoopShellIntegration ignores all shell integration events.
-type NoopShellIntegration struct{}
+// NoopSemanticPromptHandler ignores all semantic prompt events.
+type NoopSemanticPromptHandler struct{}
 
-func (NoopShellIntegration) OnMark(mark ansicode.ShellIntegrationMark, exitCode int) {}
+func (NoopSemanticPromptHandler) OnMark(mark ansicode.ShellIntegrationMark, exitCode int) {}
 
-// Ensure NoopShellIntegration satisfies the interface
-var _ ShellIntegrationProvider = (*NoopShellIntegration)(nil)
+// Ensure NoopSemanticPromptHandler satisfies the interface
+var _ SemanticPromptHandler = (*NoopSemanticPromptHandler)(nil)
 
-// ShellIntegrationMark processes a shell integration mark (OSC 133).
+// ShellIntegrationMark processes a semantic prompt mark (OSC 133).
 // Records the mark position for prompt-based navigation.
+// This method name is required by the ansicode.Handler interface.
 func (t *Terminal) ShellIntegrationMark(mark ansicode.ShellIntegrationMark, exitCode int) {
-	if t.middleware != nil && t.middleware.ShellIntegrationMark != nil {
-		t.middleware.ShellIntegrationMark(mark, exitCode, t.shellIntegrationMarkInternal)
+	if t.middleware != nil && t.middleware.SemanticPromptMark != nil {
+		t.middleware.SemanticPromptMark(mark, exitCode, t.semanticPromptMarkInternal)
 		return
 	}
-	t.shellIntegrationMarkInternal(mark, exitCode)
+	t.semanticPromptMarkInternal(mark, exitCode)
 }
 
-func (t *Terminal) shellIntegrationMarkInternal(mark ansicode.ShellIntegrationMark, exitCode int) {
+func (t *Terminal) semanticPromptMarkInternal(mark ansicode.ShellIntegrationMark, exitCode int) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
@@ -55,9 +56,9 @@ func (t *Terminal) shellIntegrationMarkInternal(mark ansicode.ShellIntegrationMa
 		ExitCode: exitCode,
 	})
 
-	// Notify provider if set
-	if t.shellIntegrationProvider != nil {
-		t.shellIntegrationProvider.OnMark(mark, exitCode)
+	// Notify handler if set
+	if t.semanticPromptHandler != nil {
+		t.semanticPromptHandler.OnMark(mark, exitCode)
 	}
 }
 
@@ -136,18 +137,18 @@ func (t *Terminal) GetPromptMarkAt(absRow int) *PromptMark {
 	return nil
 }
 
-// SetShellIntegrationProvider sets the shell integration provider at runtime.
-func (t *Terminal) SetShellIntegrationProvider(p ShellIntegrationProvider) {
+// SetSemanticPromptHandler sets the semantic prompt handler at runtime.
+func (t *Terminal) SetSemanticPromptHandler(h SemanticPromptHandler) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.shellIntegrationProvider = p
+	t.semanticPromptHandler = h
 }
 
-// ShellIntegrationProviderValue returns the current shell integration provider.
-func (t *Terminal) ShellIntegrationProviderValue() ShellIntegrationProvider {
+// SemanticPromptHandlerValue returns the current semantic prompt handler.
+func (t *Terminal) SemanticPromptHandlerValue() SemanticPromptHandler {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.shellIntegrationProvider
+	return t.semanticPromptHandler
 }
 
 // GetLastCommandOutput returns the output of the last executed command.

@@ -110,7 +110,7 @@
 //   - [ScrollbackProvider]: Stores lines scrolled off screen
 //   - [RecordingProvider]: Captures raw input for replay
 //   - [SizeProvider]: Provides pixel dimensions for queries
-//   - [ShellIntegrationProvider]: Handles shell integration marks (OSC 133)
+//   - [SemanticPromptHandler]: Handles semantic prompt marks (OSC 133)
 //
 // Example with providers:
 //
@@ -225,7 +225,7 @@
 // Track shell prompts and command output (OSC 133):
 //
 //	term := headlessterm.New(
-//	    headlessterm.WithShellIntegration(&MyHandler{}),
+//	    headlessterm.WithSemanticPromptHandler(&MyHandler{}),
 //	)
 //
 //	// Navigate between prompts (uses absolute rows, including scrollback)
