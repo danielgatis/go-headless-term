@@ -95,8 +95,8 @@ type Terminal struct {
 	template CellTemplate
 
 	// Charsets
-	charsets       [4]Charset
-	activeCharset  int
+	charsets      [4]Charset
+	activeCharset int
 	// TODO(doc): clarify semantics - charsetIndexes appears unused
 	charsetIndexes [4]CharsetIndex
 
@@ -150,7 +150,7 @@ type Terminal struct {
 
 	// Semantic prompt handler (OSC 133)
 	semanticPromptHandler SemanticPromptHandler
-	promptMarks              []PromptMark
+	promptMarks           []PromptMark
 
 	// Working directory (OSC 7)
 	workingDir string
@@ -167,6 +167,9 @@ type Terminal struct {
 
 	// Notification provider for OSC 99 (Kitty desktop notifications)
 	notificationProvider NotificationProvider
+
+	// User variables (OSC 1337 SetUserVar)
+	userVars map[string]string
 }
 
 // Option configures a Terminal during construction.
@@ -175,13 +178,13 @@ type Option func(*Terminal)
 // WithSize sets the terminal dimensions.
 // Values <= 0 are replaced with defaults (24x80).
 func WithSize(rows, cols int) Option {
-  if rows <= 0 {
-    rows = DEFAULT_ROWS
-  }
+	if rows <= 0 {
+		rows = DEFAULT_ROWS
+	}
 
-  if cols <= 0 {
-    cols = DEFAULT_COLS
-  }
+	if cols <= 0 {
+		cols = DEFAULT_COLS
+	}
 
 	return func(t *Terminal) {
 		t.rows = rows
@@ -352,6 +355,7 @@ func New(opts ...Option) *Terminal {
 		notificationProvider: NoopNotification{},
 		sixelEnabled:         true,
 		kittyEnabled:         true,
+		userVars:             make(map[string]string),
 	}
 
 	for _, opt := range opts {
@@ -470,10 +474,55 @@ func (t *Terminal) Resize(rows, cols int) {
 		}
 	}
 
+	// Update dimensions and resize buffers FIRST
 	t.rows = rows
 	t.cols = cols
 	t.primaryBuffer.Resize(rows, cols)
 	t.alternateBuffer.Resize(rows, cols)
+
+	// When growing rows on primary buffer, pull lines from scrollback
+	// to restore previously scrolled content
+	// NOTE: This must happen AFTER buffer resize so ScrollDown has room to shift content
+	if rows > oldRows && t.activeBuffer == t.primaryBuffer {
+		scrollback := t.primaryBuffer.ScrollbackProvider()
+		if scrollback != nil && scrollback.Len() > 0 {
+			linesToPull := rows - oldRows
+			if linesToPull > scrollback.Len() {
+				linesToPull = scrollback.Len()
+			}
+
+			// Pop lines from scrollback (most recent first) and collect them
+			// We need to reverse because Pop returns newest first
+			lines := make([][]Cell, linesToPull)
+			for i := linesToPull - 1; i >= 0; i-- {
+				line := scrollback.Pop()
+				if line == nil {
+					linesToPull = linesToPull - 1 - i
+					lines = lines[linesToPull-1-i:]
+					break
+				}
+				lines[i] = line
+			}
+
+			if len(lines) > 0 {
+				// Shift existing content down to make room at top
+				// Now buffer has 'rows' height, so there's room to shift
+				t.primaryBuffer.ScrollDown(0, rows, len(lines))
+
+				// Copy popped lines to the top of the buffer
+				for i, line := range lines {
+					for col, cell := range line {
+						if col < t.cols {
+							t.primaryBuffer.SetCell(i, col, cell)
+						}
+					}
+				}
+
+				// Adjust cursor position to account for the shift
+				t.cursor.Row += len(lines)
+			}
+		}
+	}
 
 	// Clamp cursor to bounds
 	if t.cursor.Row >= rows {

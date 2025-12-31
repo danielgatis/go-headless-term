@@ -369,6 +369,15 @@ func (s *testScrollback) MaxLines() int {
 	return s.maxLines
 }
 
+func (s *testScrollback) Pop() []Cell {
+	if len(s.lines) == 0 {
+		return nil
+	}
+	line := s.lines[len(s.lines)-1]
+	s.lines = s.lines[:len(s.lines)-1]
+	return line
+}
+
 func TestMiddlewareInput(t *testing.T) {
 	var intercepted []rune
 	term := New(
@@ -591,7 +600,7 @@ func TestMiddlewareMerge(t *testing.T) {
 		WithMiddleware(mw1),
 	)
 
-	term.WriteString("\x07")         // Bell
+	term.WriteString("\x07")          // Bell
 	term.WriteString("\x1b]0;Hi\x07") // Title
 
 	if bellCount != 1 {
@@ -1143,14 +1152,59 @@ func TestResizeShrinkScrollbackContent(t *testing.T) {
 	}
 }
 
-// TestResizeGrowDoesNotAffectScrollback tests that growing terminal doesn't touch scrollback
-func TestResizeGrowDoesNotAffectScrollback(t *testing.T) {
+// TestResizeGrowPullsFromScrollback tests that growing terminal pulls lines from scrollback
+func TestResizeGrowPullsFromScrollback(t *testing.T) {
+	storage := &testScrollback{lines: make([][]Cell, 0)}
+	storage.SetMaxLines(100)
+
+	term := New(WithSize(10, 80), WithScrollback(storage))
+
+	// Write content that fills the terminal
+	for i := 0; i < 10; i++ {
+		if i < 9 {
+			term.WriteString("Line" + string(rune('0'+i)) + "\r\n")
+		} else {
+			term.WriteString("Line9")
+		}
+	}
+
+	// Shrink terminal - this pushes lines to scrollback
+	term.Resize(5, 80)
+
+	scrollbackAfterShrink := storage.Len()
+	if scrollbackAfterShrink == 0 {
+		t.Fatal("expected lines in scrollback after shrink")
+	}
+
+	// Grow terminal back - should pull lines from scrollback
+	term.Resize(10, 80)
+
+	// Scrollback should have been consumed
+	if storage.Len() >= scrollbackAfterShrink {
+		t.Errorf("expected scrollback to be consumed, was %d now %d", scrollbackAfterShrink, storage.Len())
+	}
+
+	// Content should be restored at top of screen
+	foundLine0 := false
+	for i := 0; i < 10; i++ {
+		if strings.Contains(term.LineContent(i), "Line0") {
+			foundLine0 = true
+			break
+		}
+	}
+	if !foundLine0 {
+		t.Error("expected Line0 to be restored from scrollback")
+	}
+}
+
+// TestResizeGrowNoScrollbackUnchanged tests that growing terminal without scrollback doesn't change content
+func TestResizeGrowNoScrollbackUnchanged(t *testing.T) {
 	storage := &testScrollback{lines: make([][]Cell, 0)}
 	storage.SetMaxLines(100)
 
 	term := New(WithSize(5, 80), WithScrollback(storage))
 
-	// Write some content
+	// Write some content (not enough to need scrollback)
 	term.WriteString("Line0\r\n")
 	term.WriteString("Line1\r\n")
 	term.WriteString("Line2")
@@ -1162,12 +1216,12 @@ func TestResizeGrowDoesNotAffectScrollback(t *testing.T) {
 	// Grow terminal
 	term.Resize(10, 80)
 
-	// Scrollback should not change
+	// Scrollback should remain empty
 	if storage.Len() != initialScrollbackLen {
 		t.Errorf("expected scrollback unchanged, was %d now %d", initialScrollbackLen, storage.Len())
 	}
 
-	// Cursor should stay at same position
+	// Cursor should stay at same position (no lines pulled)
 	row, _ = term.CursorPos()
 	if row != initialRow {
 		t.Errorf("expected cursor to stay at row %d, got %d", initialRow, row)

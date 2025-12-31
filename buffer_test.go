@@ -147,6 +147,15 @@ func (s *testScrollbackBuffer) Clear()                { s.lines = make([][]Cell,
 func (s *testScrollbackBuffer) SetMaxLines(max int)   { s.maxLines = max }
 func (s *testScrollbackBuffer) MaxLines() int         { return s.maxLines }
 
+func (s *testScrollbackBuffer) Pop() []Cell {
+	if len(s.lines) == 0 {
+		return nil
+	}
+	line := s.lines[len(s.lines)-1]
+	s.lines = s.lines[:len(s.lines)-1]
+	return line
+}
+
 func TestBufferLineContent(t *testing.T) {
 	b := NewBuffer(24, 80)
 

@@ -3,7 +3,7 @@ module github.com/danielgatis/go-headless-term
 go 1.25.1
 
 require (
-	github.com/danielgatis/go-ansicode v1.0.13
+	github.com/danielgatis/go-ansicode v1.0.14
 	github.com/unilibs/uniwidth v0.1.0
 )
 

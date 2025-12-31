@@ -108,6 +108,9 @@ type ClipboardProvider interface {
 type ScrollbackProvider interface {
 	// Push appends a line to scrollback. Oldest lines should be removed if MaxLines is exceeded.
 	Push(line []Cell)
+	// Pop removes and returns the most recent (newest) line from scrollback.
+	// Returns nil if scrollback is empty.
+	Pop() []Cell
 	// Len returns the current number of stored lines.
 	Len() int
 	// Line returns the line at index, where 0 is the oldest line. Returns nil if out of range.
@@ -125,7 +128,7 @@ type ScrollbackProvider interface {
 // NoopClipboard ignores all clipboard operations.
 type NoopClipboard struct{}
 
-func (NoopClipboard) Read(clipboard byte) string  { return "" }
+func (NoopClipboard) Read(clipboard byte) string        { return "" }
 func (NoopClipboard) Write(clipboard byte, data []byte) {}
 
 // --- Scrollback Implementations ---
@@ -134,6 +137,7 @@ func (NoopClipboard) Write(clipboard byte, data []byte) {}
 type NoopScrollback struct{}
 
 func (NoopScrollback) Push(line []Cell)      {}
+func (NoopScrollback) Pop() []Cell           { return nil }
 func (NoopScrollback) Len() int              { return 0 }
 func (NoopScrollback) Line(index int) []Cell { return nil }
 func (NoopScrollback) Clear()                {}
@@ -174,6 +178,17 @@ func (m *MemoryScrollback) Push(line []Cell) {
 		excess := len(m.lines) - m.maxLines
 		m.lines = m.lines[excess:]
 	}
+}
+
+// Pop removes and returns the most recent (newest) line from scrollback.
+// Returns nil if scrollback is empty.
+func (m *MemoryScrollback) Pop() []Cell {
+	if len(m.lines) == 0 {
+		return nil
+	}
+	line := m.lines[len(m.lines)-1]
+	m.lines = m.lines[:len(m.lines)-1]
+	return line
 }
 
 // Len returns the current number of stored lines.

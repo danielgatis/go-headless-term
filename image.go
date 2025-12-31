@@ -21,32 +21,32 @@ const (
 
 // ImageData stores decoded image pixels and metadata.
 type ImageData struct {
-	ID        uint32      // Unique image ID
-	Width     uint32      // Image width in pixels
-	Height    uint32      // Image height in pixels
-	Data      []byte      // RGBA pixel data (always converted to RGBA internally)
-	Hash      [32]byte    // SHA-256 hash for deduplication
-	CreatedAt time.Time   // For LRU eviction
-	AccessedAt time.Time  // Last access time
+	ID         uint32    // Unique image ID
+	Width      uint32    // Image width in pixels
+	Height     uint32    // Image height in pixels
+	Data       []byte    // RGBA pixel data (always converted to RGBA internally)
+	Hash       [32]byte  // SHA-256 hash for deduplication
+	CreatedAt  time.Time // For LRU eviction
+	AccessedAt time.Time // Last access time
 }
 
 // ImagePlacement represents a displayed instance of an image.
 type ImagePlacement struct {
-	ID          uint32 // Unique placement ID
-	ImageID     uint32 // Reference to ImageData
+	ID      uint32 // Unique placement ID
+	ImageID uint32 // Reference to ImageData
 
 	// Position in terminal (cell coordinates, viewport-relative)
-	Row, Col    int
+	Row, Col int
 
 	// Size in cells
-	Cols, Rows  int
+	Cols, Rows int
 
 	// Source region (crop from original image)
-	SrcX, SrcY  uint32
-	SrcW, SrcH  uint32
+	SrcX, SrcY uint32
+	SrcW, SrcH uint32
 
 	// Z-index for layering (-1 = behind text, 0+ = in front)
-	ZIndex      int32
+	ZIndex int32
 
 	// Sub-cell offset in pixels
 	OffsetX, OffsetY uint32
@@ -55,34 +55,34 @@ type ImagePlacement struct {
 // CellImage is a lightweight reference stored in each Cell.
 // It contains UV coordinates for rendering the correct slice of the image.
 type CellImage struct {
-	PlacementID uint32  // Reference to ImagePlacement
-	ImageID     uint32  // Direct reference to ImageData for quick lookup
+	PlacementID uint32 // Reference to ImagePlacement
+	ImageID     uint32 // Direct reference to ImageData for quick lookup
 
 	// Normalized texture coordinates (0.0 - 1.0)
-	U0, V0      float32 // Top-left corner
-	U1, V1      float32 // Bottom-right corner
+	U0, V0 float32 // Top-left corner
+	U1, V1 float32 // Bottom-right corner
 
 	// Scale factors for rendering (1.0 = no scaling)
 	ScaleX, ScaleY float32
 
 	// Z-index for render ordering
-	ZIndex      int32
+	ZIndex int32
 }
 
 // ImageManager handles storage, placement, and lifecycle of terminal images.
 type ImageManager struct {
 	mu sync.RWMutex
 
-	images      map[uint32]*ImageData      // ID -> image data
-	placements  map[uint32]*ImagePlacement // PlacementID -> placement
-	hashToID    map[[32]byte]uint32        // Hash -> ID for deduplication
+	images     map[uint32]*ImageData      // ID -> image data
+	placements map[uint32]*ImagePlacement // PlacementID -> placement
+	hashToID   map[[32]byte]uint32        // Hash -> ID for deduplication
 
 	nextImageID     uint32
 	nextPlacementID uint32
 
 	// Memory management
-	maxMemory   int64 // Budget in bytes (default 320MB)
-	usedMemory  int64
+	maxMemory  int64 // Budget in bytes (default 320MB)
+	usedMemory int64
 
 	// Kitty protocol state
 	accumulator            []byte      // For chunked transfers

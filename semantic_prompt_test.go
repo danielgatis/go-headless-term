@@ -108,14 +108,14 @@ func TestSemanticPromptMark_FullSequence(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// Simulate a full shell prompt cycle
-	term.WriteString("\x1b]133;A\x07")          // Prompt start
-	term.WriteString("$ ")                      // Prompt text
-	term.WriteString("\x1b]133;B\x07")          // Command start
-	term.WriteString("ls -la")                  // User input
-	term.WriteString("\r\n")                    // Enter
-	term.WriteString("\x1b]133;C\x07")          // Command executed
-	term.WriteString("file1\r\nfile2\r\n")      // Command output
-	term.WriteString("\x1b]133;D;0\x07")        // Command finished with exit code 0
+	term.WriteString("\x1b]133;A\x07")     // Prompt start
+	term.WriteString("$ ")                 // Prompt text
+	term.WriteString("\x1b]133;B\x07")     // Command start
+	term.WriteString("ls -la")             // User input
+	term.WriteString("\r\n")               // Enter
+	term.WriteString("\x1b]133;C\x07")     // Command executed
+	term.WriteString("file1\r\nfile2\r\n") // Command output
+	term.WriteString("\x1b]133;D;0\x07")   // Command finished with exit code 0
 
 	marks := term.PromptMarks()
 	if len(marks) != 4 {
@@ -146,11 +146,11 @@ func TestSemanticPromptMark_RowTracking(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// Add marks at different rows
-	term.WriteString("\x1b]133;A\x07")  // Row 0
+	term.WriteString("\x1b]133;A\x07") // Row 0
 	term.WriteString("prompt1\r\n")
-	term.WriteString("\x1b]133;A\x07")  // Row 1
+	term.WriteString("\x1b]133;A\x07") // Row 1
 	term.WriteString("prompt2\r\n")
-	term.WriteString("\x1b]133;A\x07")  // Row 2
+	term.WriteString("\x1b]133;A\x07") // Row 2
 
 	marks := term.PromptMarks()
 	if len(marks) != 3 {
@@ -173,11 +173,11 @@ func TestSemanticPromptMark_NextPromptRow(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// Add prompts at different absolute rows
-	term.WriteString("\x1b]133;A\x07")  // Absolute row 0
+	term.WriteString("\x1b]133;A\x07") // Absolute row 0
 	term.WriteString("prompt1\r\n")
-	term.WriteString("\x1b]133;A\x07")  // Absolute row 1
+	term.WriteString("\x1b]133;A\x07") // Absolute row 1
 	term.WriteString("prompt2\r\n")
-	term.WriteString("\x1b]133;A\x07")  // Absolute row 2
+	term.WriteString("\x1b]133;A\x07") // Absolute row 2
 
 	// Find next prompt from absolute row -1 (before any content)
 	next := term.NextPromptRow(-1, -1)
@@ -208,11 +208,11 @@ func TestSemanticPromptMark_PrevPromptRow(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// Add prompts at different absolute rows
-	term.WriteString("\x1b]133;A\x07")  // Absolute row 0
+	term.WriteString("\x1b]133;A\x07") // Absolute row 0
 	term.WriteString("prompt1\r\n")
-	term.WriteString("\x1b]133;A\x07")  // Absolute row 1
+	term.WriteString("\x1b]133;A\x07") // Absolute row 1
 	term.WriteString("prompt2\r\n")
-	term.WriteString("\x1b]133;A\x07")  // Absolute row 2
+	term.WriteString("\x1b]133;A\x07") // Absolute row 2
 
 	// Find previous prompt from absolute row 3
 	prev := term.PrevPromptRow(3, -1)
@@ -243,13 +243,13 @@ func TestSemanticPromptMark_FilterByType(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// Add different mark types at absolute rows
-	term.WriteString("\x1b]133;A\x07")  // PromptStart at absolute row 0
+	term.WriteString("\x1b]133;A\x07") // PromptStart at absolute row 0
 	term.WriteString("prompt\r\n")
-	term.WriteString("\x1b]133;B\x07")  // CommandStart at absolute row 1
+	term.WriteString("\x1b]133;B\x07") // CommandStart at absolute row 1
 	term.WriteString("cmd\r\n")
-	term.WriteString("\x1b]133;C\x07")  // CommandExecuted at absolute row 2
+	term.WriteString("\x1b]133;C\x07") // CommandExecuted at absolute row 2
 	term.WriteString("output\r\n")
-	term.WriteString("\x1b]133;A\x07")  // PromptStart at absolute row 3
+	term.WriteString("\x1b]133;A\x07") // PromptStart at absolute row 3
 
 	// Find next PromptStart only using absolute rows
 	next := term.NextPromptRow(-1, ansicode.PromptStart)
@@ -283,7 +283,7 @@ func TestSemanticPromptMark_ClearMarks(t *testing.T) {
 func TestSemanticPromptMark_GetMarkAt(t *testing.T) {
 	term := New(WithSize(24, 80))
 
-	term.WriteString("\x1b]133;A\x07")  // Absolute row 0
+	term.WriteString("\x1b]133;A\x07") // Absolute row 0
 
 	// Get mark at absolute row 0
 	mark := term.GetPromptMarkAt(0)
@@ -389,14 +389,14 @@ func TestGetLastCommandOutput_Basic(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// Simulate a command with output
-	term.WriteString("\x1b]133;A\x07")       // Prompt start
+	term.WriteString("\x1b]133;A\x07") // Prompt start
 	term.WriteString("$ ")
-	term.WriteString("\x1b]133;B\x07")       // Command start
+	term.WriteString("\x1b]133;B\x07") // Command start
 	term.WriteString("echo hello")
 	term.WriteString("\r\n")
-	term.WriteString("\x1b]133;C\x07")       // Command executed
-	term.WriteString("hello\r\n")            // Output
-	term.WriteString("\x1b]133;D;0\x07")     // Command finished
+	term.WriteString("\x1b]133;C\x07")   // Command executed
+	term.WriteString("hello\r\n")        // Output
+	term.WriteString("\x1b]133;D;0\x07") // Command finished
 
 	output := term.GetLastCommandOutput()
 	expected := "hello"
@@ -408,11 +408,11 @@ func TestGetLastCommandOutput_Basic(t *testing.T) {
 func TestGetLastCommandOutput_MultiLine(t *testing.T) {
 	term := New(WithSize(24, 80))
 
-	term.WriteString("\x1b]133;C\x07")       // Command executed
+	term.WriteString("\x1b]133;C\x07") // Command executed
 	term.WriteString("line1\r\n")
 	term.WriteString("line2\r\n")
 	term.WriteString("line3\r\n")
-	term.WriteString("\x1b]133;D;0\x07")     // Command finished
+	term.WriteString("\x1b]133;D;0\x07") // Command finished
 
 	output := term.GetLastCommandOutput()
 	expected := "line1\nline2\nline3"
@@ -425,8 +425,8 @@ func TestGetLastCommandOutput_NoOutput(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	// Command with no output
-	term.WriteString("\x1b]133;C\x07")       // Command executed
-	term.WriteString("\x1b]133;D;0\x07")     // Command finished immediately
+	term.WriteString("\x1b]133;C\x07")   // Command executed
+	term.WriteString("\x1b]133;D;0\x07") // Command finished immediately
 
 	output := term.GetLastCommandOutput()
 	if output != "" {
@@ -487,7 +487,7 @@ func TestGetLastCommandOutput_WithExitCode(t *testing.T) {
 
 	term.WriteString("\x1b]133;C\x07")
 	term.WriteString("error message\r\n")
-	term.WriteString("\x1b]133;D;1\x07")     // Exit code 1
+	term.WriteString("\x1b]133;D;1\x07") // Exit code 1
 
 	output := term.GetLastCommandOutput()
 	expected := "error message"
@@ -501,8 +501,8 @@ func TestGetLastCommandOutput_TrailingEmptyLines(t *testing.T) {
 
 	term.WriteString("\x1b]133;C\x07")
 	term.WriteString("content\r\n")
-	term.WriteString("\r\n")                 // Empty line
-	term.WriteString("\r\n")                 // Another empty line
+	term.WriteString("\r\n") // Empty line
+	term.WriteString("\r\n") // Another empty line
 	term.WriteString("\x1b]133;D;0\x07")
 
 	output := term.GetLastCommandOutput()
@@ -550,6 +550,15 @@ func (s *testScrollbackForSemanticPrompt) Clear() {
 
 func (s *testScrollbackForSemanticPrompt) MaxLines() int {
 	return s.maxLines
+}
+
+func (s *testScrollbackForSemanticPrompt) Pop() []Cell {
+	if len(s.lines) == 0 {
+		return nil
+	}
+	line := s.lines[len(s.lines)-1]
+	s.lines = s.lines[:len(s.lines)-1]
+	return line
 }
 
 func TestSemanticPromptMark_NextPromptRowWithScrollback(t *testing.T) {

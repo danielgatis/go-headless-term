@@ -8,8 +8,8 @@ import (
 type SixelImage struct {
 	Width       uint32
 	Height      uint32
-	Data        []byte         // RGBA pixel data
-	Transparent bool           // Whether background is transparent
+	Data        []byte // RGBA pixel data
+	Transparent bool   // Whether background is transparent
 }
 
 // sixelParser handles parsing of Sixel data.

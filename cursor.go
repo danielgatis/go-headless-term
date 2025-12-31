@@ -33,12 +33,12 @@ func NewCursor() *Cursor {
 // SavedCursor stores cursor position, cell attributes, and charset state for restoration.
 // Used when switching between primary and alternate screens.
 type SavedCursor struct {
-	Row            int
-	Col            int
-	Attrs          CellTemplate
-	OriginMode     bool
-	CharsetIndex   int
-	Charsets       [4]Charset
+	Row          int
+	Col          int
+	Attrs        CellTemplate
+	OriginMode   bool
+	CharsetIndex int
+	Charsets     [4]Charset
 }
 
 // CellTemplate defines default attributes applied to newly written characters.

@@ -87,13 +87,13 @@ type KittyCommand struct {
 	More   bool   // m= (more data chunks coming)
 
 	// Display parameters
-	SrcX, SrcY     uint32 // x=, y= (source region origin)
-	SrcW, SrcH     uint32 // w=, h= (source region size)
-	Cols, Rows     uint32 // c=, r= (target cell size)
-	CellOffsetX    uint32 // X= (x offset within cell)
-	CellOffsetY    uint32 // Y= (y offset within cell)
-	ZIndex         int32  // z= (z-index for layering)
-	DoNotMoveCursor bool  // C= (1 = don't move cursor)
+	SrcX, SrcY      uint32 // x=, y= (source region origin)
+	SrcW, SrcH      uint32 // w=, h= (source region size)
+	Cols, Rows      uint32 // c=, r= (target cell size)
+	CellOffsetX     uint32 // X= (x offset within cell)
+	CellOffsetY     uint32 // Y= (y offset within cell)
+	ZIndex          int32  // z= (z-index for layering)
+	DoNotMoveCursor bool   // C= (1 = don't move cursor)
 
 	// Delete parameters
 	Delete KittyDelete // d=

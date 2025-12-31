@@ -267,8 +267,8 @@ func TestKittyImageUVCoordinates(t *testing.T) {
 
 	// Check UV coordinates for each cell
 	testCases := []struct {
-		row, col        int
-		u0, v0, u1, v1  float32
+		row, col       int
+		u0, v0, u1, v1 float32
 	}{
 		{0, 0, 0.0, 0.0, 0.5, 0.5}, // Top-left
 		{0, 1, 0.5, 0.0, 1.0, 0.5}, // Top-right

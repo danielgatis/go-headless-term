@@ -1913,6 +1913,46 @@ func (t *Terminal) setWorkingDirectoryInternal(uri string) {
 	t.workingDir = uri
 }
 
+// SetUserVar stores a user variable (OSC 1337 SetUserVar).
+func (t *Terminal) SetUserVar(name, value string) {
+	if t.middleware != nil && t.middleware.SetUserVar != nil {
+		t.middleware.SetUserVar(name, value, t.setUserVarInternal)
+		return
+	}
+	t.setUserVarInternal(name, value)
+}
+
+func (t *Terminal) setUserVarInternal(name, value string) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.userVars[name] = value
+}
+
+// GetUserVar returns the value of a user variable, or empty string if not set.
+func (t *Terminal) GetUserVar(name string) string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.userVars[name]
+}
+
+// GetUserVars returns a copy of all user variables.
+func (t *Terminal) GetUserVars() map[string]string {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	result := make(map[string]string, len(t.userVars))
+	for k, v := range t.userVars {
+		result[k] = v
+	}
+	return result
+}
+
+// ClearUserVars removes all user variables.
+func (t *Terminal) ClearUserVars() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.userVars = make(map[string]string)
+}
+
 // WorkingDirectory returns the current working directory URI (OSC 7).
 func (t *Terminal) WorkingDirectory() string {
 	t.mu.RLock()

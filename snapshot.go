@@ -49,25 +49,25 @@ type SnapshotLine struct {
 
 // SnapshotSegment represents a styled text segment within a line.
 type SnapshotSegment struct {
-	Text           string         `json:"text"`
-	Fg             string         `json:"fg,omitempty"`
-	Bg             string         `json:"bg,omitempty"`
-	UnderlineColor string         `json:"underline_color,omitempty"`
-	Attributes     SnapshotAttrs  `json:"attrs,omitempty"`
-	Hyperlink      *SnapshotLink  `json:"hyperlink,omitempty"`
+	Text           string        `json:"text"`
+	Fg             string        `json:"fg,omitempty"`
+	Bg             string        `json:"bg,omitempty"`
+	UnderlineColor string        `json:"underline_color,omitempty"`
+	Attributes     SnapshotAttrs `json:"attrs,omitempty"`
+	Hyperlink      *SnapshotLink `json:"hyperlink,omitempty"`
 }
 
 // SnapshotCell represents a single cell with full attributes.
 type SnapshotCell struct {
-	Char           string            `json:"char"`
-	Fg             string            `json:"fg"`
-	Bg             string            `json:"bg"`
-	UnderlineColor string            `json:"underline_color,omitempty"`
-	Attributes     SnapshotAttrs     `json:"attrs,omitempty"`
-	Hyperlink      *SnapshotLink     `json:"hyperlink,omitempty"`
+	Char           string             `json:"char"`
+	Fg             string             `json:"fg"`
+	Bg             string             `json:"bg"`
+	UnderlineColor string             `json:"underline_color,omitempty"`
+	Attributes     SnapshotAttrs      `json:"attrs,omitempty"`
+	Hyperlink      *SnapshotLink      `json:"hyperlink,omitempty"`
 	Image          *SnapshotCellImage `json:"image,omitempty"`
-	Wide           bool              `json:"wide,omitempty"`
-	WideSpacer     bool              `json:"wide_spacer,omitempty"`
+	Wide           bool               `json:"wide,omitempty"`
+	WideSpacer     bool               `json:"wide_spacer,omitempty"`
 }
 
 // SnapshotCellImage holds image reference information for a cell.

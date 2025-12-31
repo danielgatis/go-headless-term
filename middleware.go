@@ -215,6 +215,9 @@ type Middleware struct {
 
 	// DesktopNotification wraps the DesktopNotification handler (OSC 99)
 	DesktopNotification func(payload *NotificationPayload, next func(*NotificationPayload))
+
+	// SetUserVar wraps the SetUserVar handler (OSC 1337)
+	SetUserVar func(name, value string, next func(string, string))
 }
 
 // Merge copies non-nil middleware functions from other into this, overwriting existing values.
@@ -429,5 +432,8 @@ func (m *Middleware) Merge(other *Middleware) {
 	}
 	if other.DesktopNotification != nil {
 		m.DesktopNotification = other.DesktopNotification
+	}
+	if other.SetUserVar != nil {
+		m.SetUserVar = other.SetUserVar
 	}
 }

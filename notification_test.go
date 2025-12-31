@@ -7,9 +7,9 @@ import (
 
 // testNotificationProvider is a test implementation of NotificationProvider
 type testNotificationProvider struct {
-	payloads     []*NotificationPayload
-	queryReply   string
-	notifyCount  int
+	payloads    []*NotificationPayload
+	queryReply  string
+	notifyCount int
 }
 
 func (p *testNotificationProvider) Notify(payload *NotificationPayload) string {
