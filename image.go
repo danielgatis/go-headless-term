@@ -35,7 +35,7 @@ type ImagePlacement struct {
 	ID          uint32 // Unique placement ID
 	ImageID     uint32 // Reference to ImageData
 
-	// Position in terminal (cell coordinates)
+	// Position in terminal (cell coordinates, viewport-relative)
 	Row, Col    int
 
 	// Size in cells

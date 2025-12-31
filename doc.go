@@ -228,9 +228,13 @@
 //	    headlessterm.WithShellIntegration(&MyHandler{}),
 //	)
 //
-//	// Navigate between prompts
-//	nextRow := term.NextPromptRow(currentRow, -1)
-//	prevRow := term.PrevPromptRow(currentRow, -1)
+//	// Navigate between prompts (uses absolute rows, including scrollback)
+//	currentAbsRow := term.ViewportRowToAbsolute(0) // Convert viewport row to absolute
+//	nextAbsRow := term.NextPromptRow(currentAbsRow, -1)
+//	prevAbsRow := term.PrevPromptRow(currentAbsRow, -1)
+//
+//	// Convert absolute row back to viewport for display
+//	viewportRow := term.AbsoluteRowToViewport(nextAbsRow) // -1 if in scrollback
 //
 //	// Get last command output
 //	output := term.GetLastCommandOutput()

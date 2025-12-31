@@ -86,44 +86,36 @@ func (t *Terminal) ClearPromptMarks() {
 	t.promptMarks = nil
 }
 
-// NextPromptRow returns the row of the next prompt mark after the given row.
+// NextPromptRow returns the absolute row of the next prompt mark after the given absolute row.
 // Returns -1 if no next prompt exists.
 // If markType is specified (not -1), only returns marks of that type.
-func (t *Terminal) NextPromptRow(currentRow int, markType ansicode.ShellIntegrationMark) int {
+func (t *Terminal) NextPromptRow(currentAbsRow int, markType ansicode.ShellIntegrationMark) int {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
-	scrollbackLen := t.primaryBuffer.ScrollbackLen()
-	absoluteCurrentRow := currentRow + scrollbackLen
-
 	for _, mark := range t.promptMarks {
-		if mark.Row > absoluteCurrentRow {
+		if mark.Row > currentAbsRow {
 			if markType == -1 || mark.Type == markType {
-				// Convert back to relative row
-				return mark.Row - scrollbackLen
+				return mark.Row
 			}
 		}
 	}
 	return -1
 }
 
-// PrevPromptRow returns the row of the previous prompt mark before the given row.
+// PrevPromptRow returns the absolute row of the previous prompt mark before the given absolute row.
 // Returns -1 if no previous prompt exists.
 // If markType is specified (not -1), only returns marks of that type.
-func (t *Terminal) PrevPromptRow(currentRow int, markType ansicode.ShellIntegrationMark) int {
+func (t *Terminal) PrevPromptRow(currentAbsRow int, markType ansicode.ShellIntegrationMark) int {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-
-	scrollbackLen := t.primaryBuffer.ScrollbackLen()
-	absoluteCurrentRow := currentRow + scrollbackLen
 
 	// Search backwards
 	for i := len(t.promptMarks) - 1; i >= 0; i-- {
 		mark := t.promptMarks[i]
-		if mark.Row < absoluteCurrentRow {
+		if mark.Row < currentAbsRow {
 			if markType == -1 || mark.Type == markType {
-				// Convert back to relative row
-				return mark.Row - scrollbackLen
+				return mark.Row
 			}
 		}
 	}
@@ -131,15 +123,12 @@ func (t *Terminal) PrevPromptRow(currentRow int, markType ansicode.ShellIntegrat
 }
 
 // GetPromptMarkAt returns the prompt mark at the given absolute row, or nil if none exists.
-func (t *Terminal) GetPromptMarkAt(row int) *PromptMark {
+func (t *Terminal) GetPromptMarkAt(absRow int) *PromptMark {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
-	scrollbackLen := t.primaryBuffer.ScrollbackLen()
-	absoluteRow := row + scrollbackLen
-
 	for i := range t.promptMarks {
-		if t.promptMarks[i].Row == absoluteRow {
+		if t.promptMarks[i].Row == absRow {
 			mark := t.promptMarks[i]
 			return &mark
 		}

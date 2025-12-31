@@ -172,32 +172,32 @@ func TestShellIntegrationMark_RowTracking(t *testing.T) {
 func TestShellIntegrationMark_NextPromptRow(t *testing.T) {
 	term := New(WithSize(24, 80))
 
-	// Add prompts at different rows
-	term.WriteString("\x1b]133;A\x07")  // Row 0
+	// Add prompts at different absolute rows
+	term.WriteString("\x1b]133;A\x07")  // Absolute row 0
 	term.WriteString("prompt1\r\n")
-	term.WriteString("\x1b]133;A\x07")  // Row 1
+	term.WriteString("\x1b]133;A\x07")  // Absolute row 1
 	term.WriteString("prompt2\r\n")
-	term.WriteString("\x1b]133;A\x07")  // Row 2
+	term.WriteString("\x1b]133;A\x07")  // Absolute row 2
 
-	// Find next prompt from row -1 (before any content)
+	// Find next prompt from absolute row -1 (before any content)
 	next := term.NextPromptRow(-1, -1)
 	if next != 0 {
-		t.Errorf("expected next prompt at row 0, got %d", next)
+		t.Errorf("expected next prompt at absolute row 0, got %d", next)
 	}
 
-	// Find next prompt from row 0
+	// Find next prompt from absolute row 0
 	next = term.NextPromptRow(0, -1)
 	if next != 1 {
-		t.Errorf("expected next prompt at row 1, got %d", next)
+		t.Errorf("expected next prompt at absolute row 1, got %d", next)
 	}
 
-	// Find next prompt from row 1
+	// Find next prompt from absolute row 1
 	next = term.NextPromptRow(1, -1)
 	if next != 2 {
-		t.Errorf("expected next prompt at row 2, got %d", next)
+		t.Errorf("expected next prompt at absolute row 2, got %d", next)
 	}
 
-	// No next prompt from row 2
+	// No next prompt from absolute row 2
 	next = term.NextPromptRow(2, -1)
 	if next != -1 {
 		t.Errorf("expected no next prompt (-1), got %d", next)
@@ -207,32 +207,32 @@ func TestShellIntegrationMark_NextPromptRow(t *testing.T) {
 func TestShellIntegrationMark_PrevPromptRow(t *testing.T) {
 	term := New(WithSize(24, 80))
 
-	// Add prompts at different rows
-	term.WriteString("\x1b]133;A\x07")  // Row 0
+	// Add prompts at different absolute rows
+	term.WriteString("\x1b]133;A\x07")  // Absolute row 0
 	term.WriteString("prompt1\r\n")
-	term.WriteString("\x1b]133;A\x07")  // Row 1
+	term.WriteString("\x1b]133;A\x07")  // Absolute row 1
 	term.WriteString("prompt2\r\n")
-	term.WriteString("\x1b]133;A\x07")  // Row 2
+	term.WriteString("\x1b]133;A\x07")  // Absolute row 2
 
-	// Find previous prompt from row 3
+	// Find previous prompt from absolute row 3
 	prev := term.PrevPromptRow(3, -1)
 	if prev != 2 {
-		t.Errorf("expected prev prompt at row 2, got %d", prev)
+		t.Errorf("expected prev prompt at absolute row 2, got %d", prev)
 	}
 
-	// Find previous prompt from row 2
+	// Find previous prompt from absolute row 2
 	prev = term.PrevPromptRow(2, -1)
 	if prev != 1 {
-		t.Errorf("expected prev prompt at row 1, got %d", prev)
+		t.Errorf("expected prev prompt at absolute row 1, got %d", prev)
 	}
 
-	// Find previous prompt from row 1
+	// Find previous prompt from absolute row 1
 	prev = term.PrevPromptRow(1, -1)
 	if prev != 0 {
-		t.Errorf("expected prev prompt at row 0, got %d", prev)
+		t.Errorf("expected prev prompt at absolute row 0, got %d", prev)
 	}
 
-	// No previous prompt from row 0
+	// No previous prompt from absolute row 0
 	prev = term.PrevPromptRow(0, -1)
 	if prev != -1 {
 		t.Errorf("expected no prev prompt (-1), got %d", prev)
@@ -242,24 +242,24 @@ func TestShellIntegrationMark_PrevPromptRow(t *testing.T) {
 func TestShellIntegrationMark_FilterByType(t *testing.T) {
 	term := New(WithSize(24, 80))
 
-	// Add different mark types
-	term.WriteString("\x1b]133;A\x07")  // PromptStart at row 0
+	// Add different mark types at absolute rows
+	term.WriteString("\x1b]133;A\x07")  // PromptStart at absolute row 0
 	term.WriteString("prompt\r\n")
-	term.WriteString("\x1b]133;B\x07")  // CommandStart at row 1
+	term.WriteString("\x1b]133;B\x07")  // CommandStart at absolute row 1
 	term.WriteString("cmd\r\n")
-	term.WriteString("\x1b]133;C\x07")  // CommandExecuted at row 2
+	term.WriteString("\x1b]133;C\x07")  // CommandExecuted at absolute row 2
 	term.WriteString("output\r\n")
-	term.WriteString("\x1b]133;A\x07")  // PromptStart at row 3
+	term.WriteString("\x1b]133;A\x07")  // PromptStart at absolute row 3
 
-	// Find next PromptStart only
+	// Find next PromptStart only using absolute rows
 	next := term.NextPromptRow(-1, ansicode.PromptStart)
 	if next != 0 {
-		t.Errorf("expected next PromptStart at row 0, got %d", next)
+		t.Errorf("expected next PromptStart at absolute row 0, got %d", next)
 	}
 
 	next = term.NextPromptRow(0, ansicode.PromptStart)
 	if next != 3 {
-		t.Errorf("expected next PromptStart at row 3, got %d", next)
+		t.Errorf("expected next PromptStart at absolute row 3, got %d", next)
 	}
 }
 
@@ -283,20 +283,21 @@ func TestShellIntegrationMark_ClearMarks(t *testing.T) {
 func TestShellIntegrationMark_GetMarkAt(t *testing.T) {
 	term := New(WithSize(24, 80))
 
-	term.WriteString("\x1b]133;A\x07")  // Row 0
+	term.WriteString("\x1b]133;A\x07")  // Absolute row 0
 
+	// Get mark at absolute row 0
 	mark := term.GetPromptMarkAt(0)
 	if mark == nil {
-		t.Fatal("expected mark at row 0, got nil")
+		t.Fatal("expected mark at absolute row 0, got nil")
 	}
 	if mark.Type != ansicode.PromptStart {
 		t.Errorf("expected PromptStart, got %d", mark.Type)
 	}
 
-	// No mark at row 1
+	// No mark at absolute row 1
 	mark = term.GetPromptMarkAt(1)
 	if mark != nil {
-		t.Errorf("expected nil at row 1, got %v", mark)
+		t.Errorf("expected nil at absolute row 1, got %v", mark)
 	}
 }
 
@@ -509,5 +510,165 @@ func TestGetLastCommandOutput_TrailingEmptyLines(t *testing.T) {
 	expected := "content"
 	if output != expected {
 		t.Errorf("expected %q, got %q", expected, output)
+	}
+}
+
+// --- Scrollback Tests for Absolute Row Functions ---
+
+type testScrollbackForShellIntegration struct {
+	lines    [][]Cell
+	maxLines int
+}
+
+func (s *testScrollbackForShellIntegration) Push(line []Cell) {
+	lineCopy := make([]Cell, len(line))
+	copy(lineCopy, line)
+	s.lines = append(s.lines, lineCopy)
+	if s.maxLines > 0 && len(s.lines) > s.maxLines {
+		s.lines = s.lines[len(s.lines)-s.maxLines:]
+	}
+}
+
+func (s *testScrollbackForShellIntegration) Len() int {
+	return len(s.lines)
+}
+
+func (s *testScrollbackForShellIntegration) Line(index int) []Cell {
+	if index < 0 || index >= len(s.lines) {
+		return nil
+	}
+	return s.lines[index]
+}
+
+func (s *testScrollbackForShellIntegration) SetMaxLines(n int) {
+	s.maxLines = n
+}
+
+func (s *testScrollbackForShellIntegration) Clear() {
+	s.lines = nil
+}
+
+func (s *testScrollbackForShellIntegration) MaxLines() int {
+	return s.maxLines
+}
+
+func TestShellIntegrationMark_NextPromptRowWithScrollback(t *testing.T) {
+	storage := &testScrollbackForShellIntegration{lines: make([][]Cell, 0)}
+	storage.SetMaxLines(100)
+
+	// Create a small terminal (5 rows) to force scrollback
+	term := New(WithSize(5, 80), WithScrollback(storage))
+
+	// Add prompt at absolute row 0
+	term.WriteString("\x1b]133;A\x07")
+	term.WriteString("prompt1\r\n")
+
+	// Write enough lines to push content into scrollback
+	for i := 0; i < 10; i++ {
+		term.WriteString("line\r\n")
+	}
+
+	// Add another prompt (this will be at a higher absolute row)
+	term.WriteString("\x1b]133;A\x07")
+	term.WriteString("prompt2\r\n")
+
+	marks := term.PromptMarks()
+	if len(marks) != 2 {
+		t.Fatalf("expected 2 marks, got %d", len(marks))
+	}
+
+	// First mark should be at absolute row 0
+	if marks[0].Row != 0 {
+		t.Errorf("expected first mark at absolute row 0, got %d", marks[0].Row)
+	}
+
+	// Second mark should be at absolute row 11 (0 + 1 + 10 lines)
+	if marks[1].Row != 11 {
+		t.Errorf("expected second mark at absolute row 11, got %d", marks[1].Row)
+	}
+
+	// NextPromptRow should return absolute rows
+	next := term.NextPromptRow(-1, -1)
+	if next != 0 {
+		t.Errorf("expected next prompt at absolute row 0, got %d", next)
+	}
+
+	next = term.NextPromptRow(0, -1)
+	if next != 11 {
+		t.Errorf("expected next prompt at absolute row 11, got %d", next)
+	}
+
+	// Verify scrollback exists
+	scrollbackLen := term.ScrollbackLen()
+	if scrollbackLen == 0 {
+		t.Error("expected scrollback to exist")
+	}
+}
+
+func TestShellIntegrationMark_PrevPromptRowWithScrollback(t *testing.T) {
+	storage := &testScrollbackForShellIntegration{lines: make([][]Cell, 0)}
+	storage.SetMaxLines(100)
+
+	term := New(WithSize(5, 80), WithScrollback(storage))
+
+	// Add prompt at absolute row 0
+	term.WriteString("\x1b]133;A\x07")
+	term.WriteString("prompt1\r\n")
+
+	// Write enough lines to push content into scrollback
+	for i := 0; i < 10; i++ {
+		term.WriteString("line\r\n")
+	}
+
+	// Add another prompt
+	term.WriteString("\x1b]133;A\x07")
+
+	marks := term.PromptMarks()
+
+	// PrevPromptRow should return absolute rows
+	prev := term.PrevPromptRow(marks[1].Row+1, -1)
+	if prev != marks[1].Row {
+		t.Errorf("expected prev prompt at absolute row %d, got %d", marks[1].Row, prev)
+	}
+
+	prev = term.PrevPromptRow(marks[1].Row, -1)
+	if prev != 0 {
+		t.Errorf("expected prev prompt at absolute row 0, got %d", prev)
+	}
+
+	prev = term.PrevPromptRow(0, -1)
+	if prev != -1 {
+		t.Errorf("expected no prev prompt (-1), got %d", prev)
+	}
+}
+
+func TestShellIntegrationMark_GetMarkAtWithScrollback(t *testing.T) {
+	storage := &testScrollbackForShellIntegration{lines: make([][]Cell, 0)}
+	storage.SetMaxLines(100)
+
+	term := New(WithSize(5, 80), WithScrollback(storage))
+
+	// Add prompt at absolute row 0
+	term.WriteString("\x1b]133;A\x07")
+	term.WriteString("prompt\r\n")
+
+	// Write enough lines to push the prompt into scrollback
+	for i := 0; i < 10; i++ {
+		term.WriteString("line\r\n")
+	}
+
+	// GetPromptMarkAt should find mark at absolute row 0 even when in scrollback
+	mark := term.GetPromptMarkAt(0)
+	if mark == nil {
+		t.Fatal("expected mark at absolute row 0, got nil")
+	}
+	if mark.Type != ansicode.PromptStart {
+		t.Errorf("expected PromptStart, got %d", mark.Type)
+	}
+
+	// No mark at absolute row 5
+	mark = term.GetPromptMarkAt(5)
+	if mark != nil {
+		t.Errorf("expected nil at absolute row 5, got %v", mark)
 	}
 }

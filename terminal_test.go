@@ -1246,3 +1246,115 @@ func TestResizeCursorPositionAfterShrink(t *testing.T) {
 		t.Error("expected CursorLine to be visible after resize")
 	}
 }
+
+// --- Row Coordinate Conversion Tests ---
+
+func TestViewportRowToAbsolute(t *testing.T) {
+	storage := &testScrollback{lines: make([][]Cell, 0)}
+	storage.SetMaxLines(100)
+
+	term := New(WithSize(5, 80), WithScrollback(storage))
+
+	// Without scrollback, viewport row equals absolute row
+	if got := term.ViewportRowToAbsolute(0); got != 0 {
+		t.Errorf("without scrollback: expected 0, got %d", got)
+	}
+	if got := term.ViewportRowToAbsolute(3); got != 3 {
+		t.Errorf("without scrollback: expected 3, got %d", got)
+	}
+
+	// Create scrollback by writing more lines than terminal height
+	for i := 0; i < 10; i++ {
+		term.WriteString("Line\n")
+	}
+
+	scrollbackLen := term.ScrollbackLen()
+	if scrollbackLen == 0 {
+		t.Fatal("expected scrollback to exist")
+	}
+
+	// Viewport row 0 should now be at absolute row = scrollbackLen
+	if got := term.ViewportRowToAbsolute(0); got != scrollbackLen {
+		t.Errorf("with scrollback: expected %d, got %d", scrollbackLen, got)
+	}
+
+	// Viewport row 2 should be at absolute row = scrollbackLen + 2
+	if got := term.ViewportRowToAbsolute(2); got != scrollbackLen+2 {
+		t.Errorf("with scrollback: expected %d, got %d", scrollbackLen+2, got)
+	}
+}
+
+func TestAbsoluteRowToViewport(t *testing.T) {
+	storage := &testScrollback{lines: make([][]Cell, 0)}
+	storage.SetMaxLines(100)
+
+	term := New(WithSize(5, 80), WithScrollback(storage))
+
+	// Without scrollback, absolute row equals viewport row
+	if got := term.AbsoluteRowToViewport(0); got != 0 {
+		t.Errorf("without scrollback: expected 0, got %d", got)
+	}
+	if got := term.AbsoluteRowToViewport(3); got != 3 {
+		t.Errorf("without scrollback: expected 3, got %d", got)
+	}
+
+	// Out of bounds should return -1
+	if got := term.AbsoluteRowToViewport(5); got != -1 {
+		t.Errorf("out of bounds: expected -1, got %d", got)
+	}
+	if got := term.AbsoluteRowToViewport(-1); got != -1 {
+		t.Errorf("negative: expected -1, got %d", got)
+	}
+
+	// Create scrollback
+	for i := 0; i < 10; i++ {
+		term.WriteString("Line\n")
+	}
+
+	scrollbackLen := term.ScrollbackLen()
+
+	// Rows in scrollback should return -1
+	if got := term.AbsoluteRowToViewport(0); got != -1 {
+		t.Errorf("scrollback row: expected -1, got %d", got)
+	}
+	if got := term.AbsoluteRowToViewport(scrollbackLen - 1); got != -1 {
+		t.Errorf("last scrollback row: expected -1, got %d", got)
+	}
+
+	// First visible row
+	if got := term.AbsoluteRowToViewport(scrollbackLen); got != 0 {
+		t.Errorf("first visible: expected 0, got %d", got)
+	}
+
+	// Row in middle of viewport
+	if got := term.AbsoluteRowToViewport(scrollbackLen + 2); got != 2 {
+		t.Errorf("middle viewport: expected 2, got %d", got)
+	}
+
+	// Row beyond viewport
+	if got := term.AbsoluteRowToViewport(scrollbackLen + 10); got != -1 {
+		t.Errorf("beyond viewport: expected -1, got %d", got)
+	}
+}
+
+func TestRowConversionRoundTrip(t *testing.T) {
+	storage := &testScrollback{lines: make([][]Cell, 0)}
+	storage.SetMaxLines(100)
+
+	term := New(WithSize(5, 80), WithScrollback(storage))
+
+	// Create some scrollback
+	for i := 0; i < 10; i++ {
+		term.WriteString("Line\n")
+	}
+
+	// Round trip: viewport -> absolute -> viewport should return original
+	for viewportRow := 0; viewportRow < 5; viewportRow++ {
+		absRow := term.ViewportRowToAbsolute(viewportRow)
+		backToViewport := term.AbsoluteRowToViewport(absRow)
+		if backToViewport != viewportRow {
+			t.Errorf("round trip failed: viewport %d -> abs %d -> viewport %d",
+				viewportRow, absRow, backToViewport)
+		}
+	}
+}

@@ -560,6 +560,12 @@ func (b *Buffer) SetWrapped(row int, wrapped bool) {
 }
 
 // Position identifies a cell location in the terminal grid (0-based).
+// Row semantics depend on the API:
+//   - Search(), SetSelection(), GetSelectedText(): viewport-relative (0 to Rows()-1)
+//   - SearchScrollback(): negative for scrollback (-1 = most recent scrollback line)
+//   - Shell integration (PromptMark.Row): absolute (includes scrollback offset)
+//
+// Use ViewportRowToAbsolute/AbsoluteRowToViewport to convert between systems.
 type Position struct {
 	Row int
 	Col int

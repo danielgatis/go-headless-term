@@ -398,6 +398,7 @@ func (t *Terminal) Cols() int {
 }
 
 // Cell returns the cell at (row, col) in the active buffer.
+// Row is viewport-relative (0 to Rows()-1), not absolute.
 // Returns nil if coordinates are out of bounds.
 func (t *Terminal) Cell(row, col int) *Cell {
 	t.mu.RLock()
@@ -706,6 +707,30 @@ func (t *Terminal) ScrollbackLine(index int) []Cell {
 	return t.primaryBuffer.ScrollbackLine(index)
 }
 
+// ViewportRowToAbsolute converts a viewport row (0 to Rows()-1) to an absolute row.
+// Absolute rows include the scrollback offset and are used by shell integration
+// functions like NextPromptRow, PrevPromptRow, and GetPromptMarkAt.
+func (t *Terminal) ViewportRowToAbsolute(viewportRow int) int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return viewportRow + t.primaryBuffer.ScrollbackLen()
+}
+
+// AbsoluteRowToViewport converts an absolute row to a viewport row.
+// Returns -1 if the row is in scrollback or beyond the visible viewport.
+// Use this to convert shell integration row values (like PromptMark.Row)
+// to viewport coordinates for functions like Cell() or LineContent().
+func (t *Terminal) AbsoluteRowToViewport(absoluteRow int) int {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	scrollbackLen := t.primaryBuffer.ScrollbackLen()
+	viewportRow := absoluteRow - scrollbackLen
+	if viewportRow < 0 || viewportRow >= t.rows {
+		return -1
+	}
+	return viewportRow
+}
+
 // ClearScrollback removes all stored scrollback lines.
 func (t *Terminal) ClearScrollback() {
 	t.mu.Lock()
@@ -879,6 +904,7 @@ func (t *Terminal) GetSelectedText() string {
 // --- Convenience Methods ---
 
 // LineContent returns the text content of a line, trimming trailing spaces.
+// Row is viewport-relative (0 to Rows()-1), not absolute.
 // Returns empty string if the line contains only spaces or is out of bounds.
 func (t *Terminal) LineContent(row int) string {
 	t.mu.RLock()
@@ -1022,6 +1048,7 @@ func (t *Terminal) ScrollRegion() (top, bottom int) {
 // --- Wrapped Line Tracking ---
 
 // IsWrapped returns true if the line was wrapped due to column overflow, false if it ended with an explicit newline.
+// Row is viewport-relative (0 to Rows()-1), not absolute.
 func (t *Terminal) IsWrapped(row int) bool {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
