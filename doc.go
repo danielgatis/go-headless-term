@@ -99,11 +99,16 @@
 //	    line := term.ScrollbackLine(i) // []Cell
 //	}
 //
+// # PTY Writer
+//
+// [PTYWriter] writes terminal responses back to the PTY (cursor position reports, etc.):
+//
+//	term := headlessterm.New(headlessterm.WithPTYWriter(os.Stdout))
+//
 // # Providers
 //
 // Providers handle terminal events and queries. All are optional with no-op defaults:
 //
-//   - [ResponseProvider]: Writes terminal responses (cursor position, etc.)
 //   - [BellProvider]: Handles bell/beep events
 //   - [TitleProvider]: Handles window title changes (OSC 0/1/2)
 //   - [ClipboardProvider]: Handles clipboard operations (OSC 52)
@@ -115,7 +120,7 @@
 // Example with providers:
 //
 //	term := headlessterm.New(
-//	    headlessterm.WithResponse(os.Stdout),
+//	    headlessterm.WithPTYWriter(os.Stdout),
 //	    headlessterm.WithBell(&MyBellHandler{}),
 //	    headlessterm.WithTitle(&MyTitleHandler{}),
 //	)

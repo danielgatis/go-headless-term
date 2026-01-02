@@ -2,10 +2,23 @@ package headlessterm
 
 import (
 	"image/color"
+	"io"
 	"sync"
 
 	"github.com/danielgatis/go-ansicode"
 )
+
+// PTYWriter writes terminal responses (e.g., cursor position reports) back to the PTY.
+// This is used for DSR (Device Status Report), DA (Device Attributes), and other
+// terminal queries that require a response to be sent back to the controlling process.
+type PTYWriter = io.Writer
+
+// NoopPTYWriter discards all response data (useful when responses are not needed).
+type NoopPTYWriter struct{}
+
+func (NoopPTYWriter) Write(p []byte) (n int, err error) {
+	return len(p), nil
+}
 
 // Ensure Terminal implements ansicode.Handler
 var _ ansicode.Handler = (*Terminal)(nil)
@@ -134,7 +147,7 @@ type Terminal struct {
 	middleware *Middleware
 
 	// Providers for external data/actions
-	responseProvider  ResponseProvider
+	ptyWriter PTYWriter
 	bellProvider      BellProvider
 	titleProvider     TitleProvider
 	apcProvider       APCProvider
@@ -192,11 +205,11 @@ func WithSize(rows, cols int) Option {
 	}
 }
 
-// WithResponse sets the writer for terminal responses (e.g., cursor position reports).
+// WithPTYWriter sets the writer for terminal responses (e.g., cursor position reports).
 // If nil, responses are discarded.
-func WithResponse(p ResponseProvider) Option {
+func WithPTYWriter(p PTYWriter) Option {
 	return func(t *Terminal) {
-		t.responseProvider = p
+		t.ptyWriter = p
 	}
 }
 
@@ -596,18 +609,18 @@ func (t *Terminal) scrollIfNeeded() {
 	}
 }
 
-// SetResponseProvider sets the response provider at runtime.
-func (t *Terminal) SetResponseProvider(p ResponseProvider) {
+// SetPTYWriter sets the PTY writer at runtime.
+func (t *Terminal) SetPTYWriter(p PTYWriter) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
-	t.responseProvider = p
+	t.ptyWriter = p
 }
 
-// ResponseProvider returns the current response provider.
-func (t *Terminal) ResponseProvider() ResponseProvider {
+// PTYWriter returns the current PTY writer.
+func (t *Terminal) PTYWriter() PTYWriter {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
-	return t.responseProvider
+	return t.ptyWriter
 }
 
 // SetBellProvider sets the bell provider at runtime.
@@ -722,15 +735,15 @@ func (t *Terminal) Middleware() *Middleware {
 	return t.middleware
 }
 
-// writeResponse writes a response back via the response provider if set.
-// Thread-safe: reads responseProvider with lock to avoid race conditions.
+// writeResponse writes a response back via the PTY writer if set.
+// Thread-safe: reads ptyWriter with lock to avoid race conditions.
 func (t *Terminal) writeResponse(data []byte) {
 	t.mu.RLock()
-	provider := t.responseProvider
+	writer := t.ptyWriter
 	t.mu.RUnlock()
 
-	if provider != nil {
-		provider.Write(data)
+	if writer != nil {
+		writer.Write(data)
 	}
 }
 

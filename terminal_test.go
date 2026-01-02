@@ -914,7 +914,7 @@ func TestWriteResponseRaceCondition(t *testing.T) {
 	term := New(WithSize(24, 80))
 
 	var buf bytes.Buffer
-	term.SetResponseProvider(&buf)
+	term.SetPTYWriter(&buf)
 
 	// Concurrent writes to response provider
 	done := make(chan bool, 10)

@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HeadlessTerm - WebSocket Terminal</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            background: #1a1a1a;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .toolbar {
+            background: #2d2d2d;
+            padding: 6px 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border-bottom: 1px solid #404040;
+            flex-shrink: 0;
+        }
+        .status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ff4444;
+        }
+        .status.connected {
+            background: #44ff44;
+        }
+        .status-text {
+            color: #888;
+            font-size: 13px;
+            min-width: 100px;
+        }
+        .toolbar input {
+            flex: 1;
+            max-width: 300px;
+            padding: 6px 10px;
+            background: #1a1a1a;
+            border: 1px solid #404040;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 13px;
+        }
+        .toolbar input:focus {
+            outline: none;
+            border-color: #666;
+        }
+        .toolbar button {
+            padding: 6px 16px;
+            background: #404040;
+            border: none;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        .toolbar button:hover {
+            background: #505050;
+        }
+        .toolbar button.disconnect {
+            background: #663333;
+        }
+        .toolbar button.disconnect:hover {
+            background: #773333;
+        }
+        .terminal-container {
+            flex: 1;
+            overflow: hidden;
+            padding: 4px;
+            min-height: 0;
+        }
+        #terminal {
+            display: block;
+            background: #0d0d0d;
+            border-radius: 4px;
+        }
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+            font-size: 16px;
+        }
+        .hidden {
+            display: none !important;
+        }
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">Loading WASM...</div>
+
+    <div id="app" class="hidden">
+        <div class="toolbar">
+            <div class="status" id="status"></div>
+            <span class="status-text" id="status-text">Disconnected</span>
+            <input type="text" id="url" value="ws://localhost:8080/ws" placeholder="WebSocket URL">
+            <button id="connect-btn">Connect</button>
+            <span style="margin-left: auto; color: #666; font-size: 11px; display: flex; align-items: center; gap: 4px;">
+                <span style="background: #3a3a3a; padding: 2px 6px; border-radius: 3px;">Demo</span>
+                <a href="README.md" style="color: #888; text-decoration: none;" title="View documentation">?</a>
+            </span>
+        </div>
+        <div class="terminal-container">
+            <canvas id="terminal" tabindex="0"></canvas>
+        </div>
+    </div>
+
+    <script src="wasm_exec.js"></script>
+    <script src="terminal.js"></script>
+    <script>
+        let term;
+        let ws;
+        let connected = false;
+
+        // Canvas rendering state
+        let canvas, ctx;
+        let charWidth, charHeight;
+        let cursorVisible = true;
+        let cursorBlinkInterval;
+
+        const FONT_SIZE = 14;
+        const FONT_FAMILY = "'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace";
+        const BG_COLOR = '#0d0d0d';
+
+        function updateStatus(isConnected, text) {
+            connected = isConnected;
+            document.getElementById('status').classList.toggle('connected', isConnected);
+            document.getElementById('status-text').textContent = text || (isConnected ? 'Connected' : 'Disconnected');
+            document.getElementById('connect-btn').textContent = isConnected ? 'Disconnect' : 'Connect';
+            document.getElementById('connect-btn').classList.toggle('disconnect', isConnected);
+        }
+
+        function connect() {
+            if (connected) {
+                if (ws) ws.close();
+                return;
+            }
+
+            const url = document.getElementById('url').value;
+            updateStatus(false, 'Connecting...');
+
+            try {
+                ws = new WebSocket(url);
+                ws.binaryType = 'arraybuffer';
+
+                ws.onopen = () => {
+                    updateStatus(true);
+                    term.writeString('\x1b[2J\x1b[H');
+                    fullRender();
+                    sendResize();
+                };
+
+                ws.onclose = () => {
+                    updateStatus(false);
+                    term.writeString('\r\n\x1b[31m[Connection closed]\x1b[0m\r\n');
+                    fullRender();
+                };
+
+                ws.onerror = (err) => {
+                    updateStatus(false, 'Error');
+                    console.error('WebSocket error:', err);
+                };
+
+                ws.onmessage = (event) => {
+                    const data = new Uint8Array(event.data);
+                    term.write(data);
+                    cursorVisible = true; // Reset cursor visibility on new data
+                    scheduleRender();
+                };
+            } catch (err) {
+                updateStatus(false, 'Error');
+                console.error('Connection error:', err);
+            }
+        }
+
+        function sendResize() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({
+                    type: 'resize',
+                    cols: term.cols,
+                    rows: term.rows
+                }));
+            }
+        }
+
+        function sendData(data) {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                if (typeof data === 'string') {
+                    ws.send(new TextEncoder().encode(data));
+                } else {
+                    ws.send(data);
+                }
+            }
+        }
+
+        // ========== Canvas Rendering ==========
+
+        function initCanvas() {
+            canvas = document.getElementById('terminal');
+            ctx = canvas.getContext('2d');
+
+            // Measure character dimensions properly
+            ctx.font = `${FONT_SIZE}px ${FONT_FAMILY}`;
+            const metrics = ctx.measureText('MMMMMMMMMM');
+            charWidth = Math.ceil(metrics.width / 10);
+            charHeight = Math.ceil(FONT_SIZE * 1.5); // More vertical space
+
+            console.log(`Char dimensions: ${charWidth}x${charHeight}px`);
+        }
+
+        function resizeCanvas() {
+            const container = document.querySelector('.terminal-container');
+            const rect = container.getBoundingClientRect();
+            const padding = 8;
+
+            const width = rect.width - padding * 2;
+            const height = rect.height - padding * 2;
+
+            const cols = Math.floor(width / charWidth);
+            const rows = Math.floor(height / charHeight);
+
+            // Set canvas size
+            canvas.width = cols * charWidth;
+            canvas.height = rows * charHeight;
+            canvas.style.width = canvas.width + 'px';
+            canvas.style.height = canvas.height + 'px';
+
+            // Restore font after resize (canvas reset clears it)
+            ctx.font = `${FONT_SIZE}px ${FONT_FAMILY}`;
+            ctx.textBaseline = 'middle';
+
+            console.log(`Canvas: ${cols}x${rows} (${canvas.width}x${canvas.height}px)`);
+
+            return { rows: Math.max(10, rows), cols: Math.max(40, cols) };
+        }
+
+        function rgbToCSS(color) {
+            return `rgb(${color.r},${color.g},${color.b})`;
+        }
+
+        function drawCell(row, col, cell, isCursor) {
+            const x = col * charWidth;
+            const y = row * charHeight;
+
+            const fg = cell.fg;
+            const bg = cell.bg;
+            let char = cell.char || ' ';
+            if (char === '\0') char = ' ';
+
+            // Clear the cell first to prevent ghosting
+            ctx.clearRect(x, y, charWidth, charHeight);
+
+            // Background
+            const hasBg = bg.r !== 0 || bg.g !== 0 || bg.b !== 0 || bg.a !== 0;
+            if (isCursor && cursorVisible) {
+                ctx.fillStyle = '#ffffff';
+            } else if (hasBg) {
+                ctx.fillStyle = rgbToCSS(bg);
+            } else {
+                ctx.fillStyle = BG_COLOR;
+            }
+            ctx.fillRect(x, y, charWidth, charHeight);
+
+            // Character - center vertically using middle baseline
+            if (isCursor && cursorVisible) {
+                ctx.fillStyle = '#000000';
+            } else {
+                ctx.fillStyle = rgbToCSS(fg);
+            }
+
+            // Apply styles
+            let fontStyle = '';
+            if (cell.bold) fontStyle += 'bold ';
+            if (cell.italic) fontStyle += 'italic ';
+            if (fontStyle) {
+                ctx.font = `${fontStyle}${FONT_SIZE}px ${FONT_FAMILY}`;
+            }
+
+            // Draw character centered in cell
+            ctx.fillText(char, x, y + charHeight / 2);
+
+            // Reset font if we changed it
+            if (fontStyle) {
+                ctx.font = `${FONT_SIZE}px ${FONT_FAMILY}`;
+            }
+
+            // Underline
+            if (cell.underline) {
+                ctx.strokeStyle = rgbToCSS(fg);
+                ctx.beginPath();
+                ctx.moveTo(x, y + charHeight - 2);
+                ctx.lineTo(x + charWidth, y + charHeight - 2);
+                ctx.stroke();
+            }
+
+            // Strikethrough
+            if (cell.strike) {
+                ctx.strokeStyle = rgbToCSS(fg);
+                ctx.beginPath();
+                ctx.moveTo(x, y + charHeight / 2);
+                ctx.lineTo(x + charWidth, y + charHeight / 2);
+                ctx.stroke();
+            }
+        }
+
+        function fullRender() {
+            if (!term || !ctx) return;
+
+            const cursorPos = term.cursorPos;
+            const showCursor = term.cursorVisible;
+
+            for (let row = 0; row < term.rows; row++) {
+                for (let col = 0; col < term.cols; col++) {
+                    const cell = term.cell(row, col);
+                    if (!cell) continue;
+                    const isCursor = showCursor && row === cursorPos.row && col === cursorPos.col;
+                    drawCell(row, col, cell, isCursor);
+                }
+            }
+
+            term.clearDirty();
+        }
+
+        let renderPending = false;
+        let lastCursorPos = { row: -1, col: -1 };
+
+        function scheduleRender() {
+            if (!renderPending) {
+                renderPending = true;
+                requestAnimationFrame(() => {
+                    renderPending = false;
+                    renderDirty();
+                });
+            }
+        }
+
+        function renderDirty() {
+            if (!term || !ctx) return;
+
+            const cursorPos = term.cursorPos;
+            const showCursor = term.cursorVisible;
+
+            // Redraw old cursor position (to clear it)
+            if (lastCursorPos.row >= 0 && lastCursorPos.col >= 0) {
+                const oldCell = term.cell(lastCursorPos.row, lastCursorPos.col);
+                if (oldCell) {
+                    drawCell(lastCursorPos.row, lastCursorPos.col, oldCell, false);
+                }
+            }
+
+            // Get and render dirty cells
+            const dirtyCells = term.dirtyCells();
+            for (const pos of dirtyCells) {
+                const cell = term.cell(pos.row, pos.col);
+                if (!cell) continue;
+                const isCursor = showCursor && pos.row === cursorPos.row && pos.col === cursorPos.col;
+                drawCell(pos.row, pos.col, cell, isCursor);
+            }
+
+            // Draw new cursor position
+            if (showCursor) {
+                const cursorCell = term.cell(cursorPos.row, cursorPos.col);
+                if (cursorCell) {
+                    drawCell(cursorPos.row, cursorPos.col, cursorCell, true);
+                }
+            }
+
+            lastCursorPos = { row: cursorPos.row, col: cursorPos.col };
+            term.clearDirty();
+        }
+
+        function startCursorBlink() {
+            if (cursorBlinkInterval) clearInterval(cursorBlinkInterval);
+            cursorBlinkInterval = setInterval(() => {
+                if (!term) return;
+                cursorVisible = !cursorVisible;
+                const pos = term.cursorPos;
+                if (pos.row >= 0 && pos.row < term.rows && pos.col >= 0 && pos.col < term.cols) {
+                    const cell = term.cell(pos.row, pos.col);
+                    if (cell) {
+                        drawCell(pos.row, pos.col, cell, term.cursorVisible && cursorVisible);
+                    }
+                }
+            }, 530);
+        }
+
+        // ========== Keyboard Handling ==========
+
+        function handleKeydown(e) {
+            if (!connected) return;
+
+            if (!e.altKey && !e.metaKey) {
+                e.preventDefault();
+            }
+
+            let data = '';
+
+            if (e.ctrlKey && !e.altKey && !e.metaKey) {
+                const key = e.key.toLowerCase();
+                if (key >= 'a' && key <= 'z') {
+                    data = String.fromCharCode(key.charCodeAt(0) - 96);
+                }
+            } else if (!e.ctrlKey && !e.altKey && !e.metaKey) {
+                switch (e.key) {
+                    case 'Enter': data = '\r'; break;
+                    case 'Backspace': data = '\x7f'; break;
+                    case 'Tab': data = '\t'; break;
+                    case 'Escape': data = '\x1b'; break;
+                    case 'ArrowUp': data = '\x1b[A'; break;
+                    case 'ArrowDown': data = '\x1b[B'; break;
+                    case 'ArrowRight': data = '\x1b[C'; break;
+                    case 'ArrowLeft': data = '\x1b[D'; break;
+                    case 'Home': data = '\x1b[H'; break;
+                    case 'End': data = '\x1b[F'; break;
+                    case 'PageUp': data = '\x1b[5~'; break;
+                    case 'PageDown': data = '\x1b[6~'; break;
+                    case 'Delete': data = '\x1b[3~'; break;
+                    case 'Insert': data = '\x1b[2~'; break;
+                    case 'F1': data = '\x1bOP'; break;
+                    case 'F2': data = '\x1bOQ'; break;
+                    case 'F3': data = '\x1bOR'; break;
+                    case 'F4': data = '\x1bOS'; break;
+                    case 'F5': data = '\x1b[15~'; break;
+                    case 'F6': data = '\x1b[17~'; break;
+                    case 'F7': data = '\x1b[18~'; break;
+                    case 'F8': data = '\x1b[19~'; break;
+                    case 'F9': data = '\x1b[20~'; break;
+                    case 'F10': data = '\x1b[21~'; break;
+                    case 'F11': data = '\x1b[23~'; break;
+                    case 'F12': data = '\x1b[24~'; break;
+                    default:
+                        if (e.key.length === 1) data = e.key;
+                }
+            } else if (e.altKey && !e.ctrlKey && !e.metaKey) {
+                if (e.key.length === 1) data = '\x1b' + e.key;
+            }
+
+            if (data) sendData(data);
+        }
+
+        // ========== Initialization ==========
+
+        async function init() {
+            try {
+                await Terminal.init('headlessterm.wasm');
+
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('app').classList.remove('hidden');
+
+                initCanvas();
+                const size = resizeCanvas();
+
+                term = new Terminal(size.rows, size.cols);
+
+                term.on('ptyWrite', (data) => sendData(data));
+
+                // Welcome banner
+                term.writeString('\x1b[1;36m╔════════════════════════════════════════════════════════════╗\x1b[0m\r\n');
+                term.writeString('\x1b[1;36m║\x1b[0m  \x1b[1;37mHeadlessTerm\x1b[0m - WebSocket Terminal Demo                    \x1b[1;36m║\x1b[0m\r\n');
+                term.writeString('\x1b[1;36m╚════════════════════════════════════════════════════════════╝\x1b[0m\r\n\r\n');
+
+                // Disclaimer
+                term.writeString('\x1b[33m⚠  This is a minimal example implementation.\x1b[0m\r\n\r\n');
+                term.writeString('\x1b[90mFeatures available in the full API but not shown here:\x1b[0m\r\n');
+                term.writeString('\x1b[90m  • Mouse support (clicks, motion, scroll)\x1b[0m\r\n');
+                term.writeString('\x1b[90m  • Text selection and clipboard\x1b[0m\r\n');
+                term.writeString('\x1b[90m  • Sixel and Kitty graphics protocols\x1b[0m\r\n');
+                term.writeString('\x1b[90m  • Scrollback history\x1b[0m\r\n');
+                term.writeString('\x1b[90m  • Hyperlinks (OSC 8)\x1b[0m\r\n');
+                term.writeString('\x1b[90m  • Shell integration (OSC 133)\x1b[0m\r\n');
+                term.writeString('\x1b[90m  • Desktop notifications (OSC 99)\x1b[0m\r\n\r\n');
+                term.writeString('\x1b[90mSee \x1b[4mREADME.md\x1b[24m for complete API documentation.\x1b[0m\r\n\r\n');
+
+                // Call to action
+                term.writeString('\x1b[32m➜ Click Connect to start a shell session\x1b[0m\r\n\r\n');
+
+                fullRender();
+                startCursorBlink();
+
+                canvas.focus();
+
+            } catch (err) {
+                document.getElementById('loading').textContent = 'Error: ' + err.message;
+                console.error(err);
+            }
+        }
+
+        // Event listeners
+        document.getElementById('connect-btn').addEventListener('click', connect);
+
+        document.getElementById('url').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') connect();
+        });
+
+        document.getElementById('terminal').addEventListener('keydown', handleKeydown);
+
+        document.getElementById('terminal').addEventListener('blur', () => {
+            if (connected) {
+                setTimeout(() => document.getElementById('terminal').focus(), 10);
+            }
+        });
+
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (!term) return;
+                const size = resizeCanvas();
+                term.resize(size.rows, size.cols);
+                fullRender();
+                sendResize();
+            }, 100);
+        });
+
+        init();
+    </script>
+</body>
+</html>

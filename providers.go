@@ -1,25 +1,12 @@
 package headlessterm
 
 import (
-	"io"
-
 	"github.com/danielgatis/go-ansicode"
 )
 
 // NotificationPayload is re-exported from go-ansicode for use by notification providers.
 // This allows consumers to implement NotificationProvider without importing go-ansicode directly.
 type NotificationPayload = ansicode.NotificationPayload
-
-// ResponseProvider writes terminal responses (e.g., cursor position reports) back to the PTY.
-// Typically an io.Writer connected to the PTY input.
-type ResponseProvider = io.Writer
-
-// NoopResponse discards all response data (useful when responses are not needed).
-type NoopResponse struct{}
-
-func (NoopResponse) Write(p []byte) (n int, err error) {
-	return len(p), nil
-}
 
 // --- Bell Provider ---
 
@@ -92,8 +79,6 @@ type NoopSOS struct{}
 
 func (NoopSOS) Receive(data []byte) {}
 
-// Ensure implementations satisfy their interfaces
-var _ ResponseProvider = NoopResponse{}
 
 // ClipboardProvider handles clipboard read/write operations (OSC 52).
 type ClipboardProvider interface {
