@@ -148,7 +148,7 @@ Configure terminal at creation:
 - `WithSize(rows, cols)`: Set dimensions (default: 24x80)
 - `WithAutoResize()`: Buffer grows instead of scrolling/wrapping
 - `WithScrollback(provider)`: Custom scrollback storage
-- `WithResponse(writer)`: Writer for terminal responses (DSR, etc.)
+- `WithPTYWriter(writer)`: Writer for terminal responses (DSR, etc.)
 - `WithBell(provider)`: Handler for bell events
 - `WithTitle(provider)`: Handler for title changes
 - `WithClipboard(provider)`: Handler for OSC 52 clipboard

@@ -528,7 +528,7 @@ func TestResponseWriter(t *testing.T) {
 
 	term := New(
 		WithSize(24, 80),
-		WithResponse(writer),
+		WithPTYWriter(writer),
 	)
 
 	// Device status request (should trigger a response)
