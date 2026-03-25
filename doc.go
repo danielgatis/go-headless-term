@@ -32,7 +32,7 @@
 //	term := headlessterm.New(
 //	    headlessterm.WithSize(24, 80),           // 24 rows, 80 columns
 //	    headlessterm.WithScrollback(storage),    // Enable scrollback
-//	    headlessterm.WithResponse(ptyWriter),    // Handle terminal responses
+//	    headlessterm.WithPTYWriter(ptyWriter),    // Handle terminal responses
 //	)
 //
 //	// Process output from a command

@@ -287,10 +287,10 @@ func TestOSC1337SpecialCharacters(t *testing.T) {
 	}
 }
 
-// TestUserVarsWithResponse tests that OSC 1337 works with response writer
-func TestUserVarsWithResponse(t *testing.T) {
+// TestUserVarsWithPTYWriter tests that OSC 1337 works with response writer
+func TestUserVarsWithPTYWriter(t *testing.T) {
 	var buf bytes.Buffer
-	term := New(WithResponse(&buf))
+	term := New(WithPTYWriter(&buf))
 
 	// OSC 1337 SetUserVar doesn't generate a response
 	osc := "\x1b]1337;SetUserVar=TEST=dGVzdA==\x07"

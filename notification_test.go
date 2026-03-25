@@ -145,7 +145,7 @@ func TestDesktopNotificationQueryResponse(t *testing.T) {
 
 	term := New(
 		WithNotification(provider),
-		WithResponse(writer),
+		WithPTYWriter(writer),
 	)
 
 	payload := &NotificationPayload{
